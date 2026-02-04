@@ -93,13 +93,13 @@ panic = "deny"
 unimplemented = "deny"
 todo = "deny"
 
-# Warn - Correctness
-correctness = "warn"
-suspicious = "warn"
-complexity = "warn"
-perf = "warn"
-style = "warn"
-pedantic = "warn"
+# Warn - Lint groups (priority -1 to run before individual lints)
+correctness = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
 
 # Warn - Specific lints
 missing_errors_doc = "warn"
@@ -127,4 +127,4 @@ similar_names = "allow"
 missing_docs = "warn"
 unreachable_pub = "warn"
 unused_must_use = "deny"
-rust_2018_idioms = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
