@@ -17,6 +17,7 @@ pub fn create_migrated_plugin_registry() -> PluginRegistry {
     registry.register("removeEmptyAttrs", || RemoveEmptyAttrsPlugin::new());
     registry.register("removeUselessDefs", || RemoveUselessDefsPlugin::new());
     registry.register("collapseGroups", || CollapseGroupsPlugin::new());
+    registry.register("moveElemsAttrsToGroup", || MoveElemsAttrsToGroupPlugin::new());
     registry.register("moveGroupAttrsToElems", || MoveGroupAttrsToElemsPlugin::new());
     registry.register("removeUnknownsAndDefaults", || RemoveUnknownsAndDefaultsPlugin::new());
     registry.register("convertColors", || ConvertColorsPlugin::new());

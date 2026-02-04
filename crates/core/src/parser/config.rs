@@ -314,6 +314,6 @@ pub fn load_config_from_directory<P: AsRef<std::path::Path>>(
         }
     }
 
-    // Return default config if no config file found
-    Ok(Config::default())
+    // Return default preset with all standard plugins if no config file found
+    Ok(Config::with_default_preset())
 }

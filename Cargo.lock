@@ -3065,6 +3065,7 @@ dependencies = [
  "tempfile",
  "toml 0.8.23",
  "vexy-svgo-core",
+ "vexy-svgo-plugin-sdk",
 ]
 
 [[package]]

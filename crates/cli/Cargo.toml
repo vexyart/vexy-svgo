@@ -37,6 +37,7 @@ path = "src/main.rs"
 
 [dependencies]
 vexy-svgo-core = { workspace = true }
+vexy-svgo-plugin-sdk = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }

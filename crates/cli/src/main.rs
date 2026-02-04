@@ -11,7 +11,14 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use vexy_svgo_core::{optimize_with_config, Config, VERSION, error::VexyError};
+use vexy_svgo_core::{optimize, OptimizeOptions, Config, VERSION, error::VexyError, OptimizationResult};
+use vexy_svgo_plugin_sdk::registry::create_migrated_plugin_registry;
+
+fn optimize_with_plugins(input: &str, config: Config) -> Result<OptimizationResult, VexyError> {
+    let registry = create_migrated_plugin_registry();
+    let options = OptimizeOptions::new(config).with_registry(registry);
+    optimize(input, options)
+}
 
 #[derive(Debug)]
 enum InputMode {
@@ -408,7 +415,7 @@ fn process_string(
     if verbose {
         println!("{} Optimizing SVG content ({} bytes)", "🔧".bright_cyan(), content.len().to_string().bright_white());
     }
-    let result = optimize_with_config(content, config.clone())?;
+    let result = optimize_with_plugins(content, config.clone())?;
     
     if verbose {
         println!("{} Optimization complete: {} {} {} bytes", "✅".bright_green(), 
@@ -475,7 +482,7 @@ fn process_files(
                 return Err("Cannot output multiple files to stdout".into());
             }
             let content = fs::read_to_string(&files[0])?;
-            let result = optimize_with_config(&content, config.clone())?;
+            let result = optimize_with_plugins(&content, config.clone())?;
             print!("{}", result.data);
             io::stdout().flush()?;
         }
@@ -484,7 +491,7 @@ fn process_files(
                 return Err("Cannot output multiple files to a single file".into());
             }
             let content = fs::read_to_string(&files[0])?;
-            let result = optimize_with_config(&content, config.clone())?;
+            let result = optimize_with_plugins(&content, config.clone())?;
             if !dry_run {
                 fs::write(&output_path, &result.data)?;
             }
@@ -519,7 +526,7 @@ fn process_files(
 
             for file in files {
                 let content = fs::read_to_string(file)?;
-                let result = optimize_with_config(&content, config.clone())?;
+                let result = optimize_with_plugins(&content, config.clone())?;
 
                 let file_path = Path::new(file);
                 let file_name = file_path
@@ -555,7 +562,7 @@ fn process_files(
         OutputMode::InPlace => {
             for file in files {
                 let content = fs::read_to_string(file)?;
-                let result = optimize_with_config(&content, config.clone())?;
+                let result = optimize_with_plugins(&content, config.clone())?;
                 if !dry_run {
                     fs::write(file, &result.data)?;
                 }
@@ -658,7 +665,7 @@ fn process_folder(
 
         match fs::read_to_string(svg_file) {
             Ok(content) => {
-                match optimize_with_config(&content, config.clone()) {
+                match optimize_with_plugins(&content, config.clone()) {
                     Ok(result) => {
                         if !dry_run {
                             fs::write(svg_file, &result.data)?;
