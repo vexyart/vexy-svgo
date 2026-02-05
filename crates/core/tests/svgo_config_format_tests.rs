@@ -9,7 +9,8 @@
 //! - svgo.config.mjs (ES modules)
 //! - Package.json svgo field
 
-use vexy_svgo_core::{Config, PluginConfig, optimize_with_config};
+use vexy_svgo_core::parser::config::{Config, PluginConfig, DataUriFormat, LineEnding};
+use vexy_svgo_core::optimize_with_config;
 use serde_json::json;
 
 #[test]
@@ -101,15 +102,21 @@ fn test_svgo_v3_plugin_format() {
 
 #[test]
 fn test_svgo_global_params() {
-    // Test global parameters that affect all plugins
     let mut config = Config::default();
     
-    // Set precision globally (affects path data, transforms, etc.)
-    config.float_precision = Some(2);
-    
     config.plugins = vec![
-        PluginConfig::Name("convertPathData".to_string()),
-        PluginConfig::Name("convertTransform".to_string()),
+        PluginConfig::WithParams {
+            name: "convertPathData".to_string(),
+            params: json!({
+                "floatPrecision": 2
+            }),
+        },
+        PluginConfig::WithParams {
+            name: "convertTransform".to_string(),
+            params: json!({
+                "floatPrecision": 2
+            }),
+        },
     ];
     
     let svg = r#"<svg>
@@ -121,7 +128,6 @@ fn test_svgo_global_params() {
     
     let result = optimize_with_config(svg, config).unwrap();
     
-    // Numbers should be rounded to 2 decimal places
     assert!(!result.data.contains("10.123456"));
     assert!(!result.data.contains("10.999999"));
 }
@@ -155,24 +161,17 @@ fn test_svgo_multipass_config() {
 
 #[test]
 fn test_svgo_js2svg_options() {
-    // Test various output formatting options
     let mut config = Config::default();
     
-    // Pretty print with custom indent
     config.js2svg.pretty = true;
-    config.js2svg.indent = "  ".to_string(); // 2 spaces
+    config.js2svg.indent = "  ".to_string();
     config.js2svg.final_newline = true;
-    
-    // Quote style
-    config.js2svg.quote_attrs = vexy_svgo_core::config::QuoteAttrsStyle::IfNeeded;
     
     let svg = r#"<svg><g><rect id="test" width="100"/></g></svg>"#;
     
     let result = optimize_with_config(svg, config).unwrap();
     
-    // Should have newlines and indentation
     assert!(result.data.contains("\n"));
-    // Should end with newline
     assert!(result.data.ends_with("\n"));
 }
 

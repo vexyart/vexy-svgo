@@ -314,8 +314,8 @@ mod tests {
         assert_eq!(info.original_size, 1000);
         assert_eq!(info.optimized_size, 800);
         assert_eq!(info.size_reduction(), 200);
-        assert_eq!(info.compression_ratio, 0.2);
-        assert_eq!(info.compression_percentage(), 20.0);
+        assert!((info.compression_ratio - 0.2).abs() < f64::EPSILON);
+        assert!((info.compression_percentage() - 20.0).abs() < 0.001);
         assert_eq!(info.plugins_applied, 5);
         assert_eq!(info.passes, 2);
         

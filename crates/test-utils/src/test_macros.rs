@@ -9,7 +9,7 @@ extern crate vexy_svgo_core;
 /// Expects `testdata/plugins/{plugin_name}/` to contain .txt files with SVGO-style fixtures.
 ///
 /// Usage:
-/// ```
+/// ```ignore
 /// generate_plugin_tests!("cleanupAttrs");
 /// generate_plugin_tests!("convertColors");
 /// ```

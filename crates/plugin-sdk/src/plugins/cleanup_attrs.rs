@@ -65,6 +65,10 @@ impl Plugin for CleanupAttrsPlugin {
     }
 
     fn validate_params(&self, params: &serde_json::Value) -> anyhow::Result<()> {
+        // Accept null or empty object as valid (use defaults)
+        if params.is_null() || params.as_object().map_or(false, |obj| obj.is_empty()) {
+            return Ok(());
+        }
         // Try to deserialize the params to validate their structure
         serde_json::from_value::<CleanupAttrsParams>(params.clone())
             .map_err(|e| anyhow::anyhow!("Invalid parameters: {}", e))?;
@@ -277,24 +281,18 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add attributes to root element for testing
-        doc.root
-            .attributes
-            .insert("class".to_string(), "  my-class  ".to_string());
-        doc.root
-            .attributes
-            .insert("title".to_string(), "Title\nwith\nnewlines".to_string());
-        doc.root
-            .attributes
-            .insert("style".to_string(), "color:    red;    font-size:    14px".to_string());
+        doc.root.set_attr("class", "  my-class  ");
+        doc.root.set_attr("title", "Title\nwith\nnewlines");
+        doc.root.set_attr("style", "color:    red;    font-size:    14px");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
 
         // Check that attributes were cleaned
-        assert_eq!(doc.root.attributes.get("class").unwrap(), "my-class");
-        assert_eq!(doc.root.attributes.get("title").unwrap(), "Title with newlines");
-        assert_eq!(doc.root.attributes.get("style").unwrap(), "color: red; font-size: 14px");
+        assert_eq!(doc.root.attr("class"), Some("my-class"));
+        assert_eq!(doc.root.attr("title"), Some("Title with newlines"));
+        assert_eq!(doc.root.attr("style"), Some("color: red; font-size: 14px"));
     }
 
     #[test]
