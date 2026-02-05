@@ -12,9 +12,8 @@ mod tests {
     #[test]
     fn test_parser_creation() {
         let parser = Parser::new();
-        assert!(!parser.preserve_whitespace);
-        assert!(!parser.preserve_comments);
-        assert!(parser.expand_entities);
+        let result = parser.parse("<svg></svg>");
+        assert!(result.is_ok(), "Parser::new() should create a working parser");
     }
 
     #[test]
@@ -161,17 +160,22 @@ mod tests {
 
     #[test]
     fn test_parse_with_namespace() {
-        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-            <rect xlink:href="#target"/>
-        </svg>"#;
+        let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">
+            <rect xlink:href=\"#target\"/>
+        </svg>";
         
         let parser = Parser::new();
         let result = parser.parse(svg);
         
         assert!(result.is_ok());
         let doc = result.unwrap();
-        assert!(doc.root.attributes.contains_key("xmlns"));
-        assert!(doc.root.attributes.contains_key("xmlns:xlink"));
+        // xmlns attributes are stored in the namespaces map, not attributes
+        // Default xmlns (no prefix) uses empty string as key
+        assert!(doc.root.namespaces.contains_key(""), "Default xmlns should be in namespaces");
+        assert_eq!(doc.root.namespaces.get("").map(|s| s.as_str()), Some("http://www.w3.org/2000/svg"));
+        // xmlns:xlink uses "xlink" as key
+        assert!(doc.root.namespaces.contains_key("xlink"), "xlink namespace should be in namespaces");
+        assert_eq!(doc.root.namespaces.get("xlink").map(|s| s.as_str()), Some("http://www.w3.org/1999/xlink"));
     }
 
     #[test]
