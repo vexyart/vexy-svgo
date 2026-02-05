@@ -10,6 +10,7 @@ use anyhow::Result;
 use std::collections::HashSet;
 use vexy_svgo_core::ast::{Document, Element};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Plugin that removes viewBox attribute when possible
 pub struct RemoveViewBoxPlugin;
@@ -117,7 +118,7 @@ impl ViewBoxRemovalVisitor {
 }
 
 impl Visitor<'_> for ViewBoxRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Check if this element can have viewBox removed (before pushing to stack)
         if RemoveViewBoxPlugin::viewbox_elements().contains(element.name.as_ref()) {
             let is_nested_svg = self.is_nested_svg(&element.name);
@@ -133,7 +134,7 @@ impl Visitor<'_> for ViewBoxRemovalVisitor {
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<(), VexyError> {
         // Pop current element from stack
         self.element_stack.pop();
         Ok(())

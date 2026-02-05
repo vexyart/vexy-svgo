@@ -211,9 +211,7 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add enable-background="new" to root element
-        doc.root
-            .attributes
-            .insert("enable-background".to_string(), "new".to_string());
+        doc.root.set_attr("enable-background", "new");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
@@ -230,9 +228,7 @@ mod unit_tests {
 
         // Add enable-background with coordinates to SVG element
         doc.root.name = "svg".into();
-        doc.root
-            .attributes
-            .insert("enable-background".to_string(), "new 0 0 100 100".to_string());
+        doc.root.set_attr("enable-background", "new 0 0 100 100");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
@@ -249,9 +245,7 @@ mod unit_tests {
 
         // Create a g element with enable-background
         let mut g_element = Element::new("g");
-        g_element
-            .attributes
-            .insert("enable-background".to_string(), "new 0 0 100 100".to_string());
+        g_element.set_attr("enable-background", "new 0 0 100 100");
         
         doc.root.children.push(vexy_svgo_core::ast::Node::Element(g_element));
 
@@ -271,12 +265,8 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add enable-background and filter to element
-        doc.root
-            .attributes
-            .insert("enable-background".to_string(), "new".to_string());
-        doc.root
-            .attributes
-            .insert("filter".to_string(), "url(#myFilter)".to_string());
+        doc.root.set_attr("enable-background", "new");
+        doc.root.set_attr("filter", "url(#myFilter)");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
@@ -292,14 +282,14 @@ mod unit_tests {
         
         // Test feBlend with BackgroundImage
         let mut element = Element::new("feBlend");
-        element.attributes.insert("in".to_string(), "BackgroundImage".to_string());
+        element.set_attr("in", "BackgroundImage");
         visitor.check_for_background_image_filter(&element);
         assert!(visitor.has_background_image_filter);
 
         // Test feImage with BackgroundAlpha
         let mut visitor2 = CleanupEnableBackgroundVisitor::new();
         let mut element2 = Element::new("feImage");
-        element2.attributes.insert("in2".to_string(), "BackgroundAlpha".to_string());
+        element2.set_attr("in2", "BackgroundAlpha");
         visitor2.check_for_background_image_filter(&element2);
         assert!(visitor2.has_background_image_filter);
     }

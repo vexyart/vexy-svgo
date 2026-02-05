@@ -291,9 +291,7 @@ impl MinifyStylesPlugin {
                                 .trim()
                                 .to_string();
                             if !cleaned.is_empty() {
-                                child_elem
-                                    .attributes
-                                    .insert("style".into(), cleaned.into());
+                                child_elem.set_attr("style", cleaned);
                             } else {
                                 child_elem.attributes.shift_remove("style");
                             }
@@ -413,9 +411,7 @@ mod unit_tests {
 
         // Test element with onclick
         let mut button = create_element("button");
-        button
-            .attributes
-            .insert("onclick".to_string(), "alert('test')".to_string());
+        button.set_attr("onclick", "alert('test')");
         assert!(plugin._has_scripts(&button));
 
         // Test normal element
@@ -430,14 +426,12 @@ mod unit_tests {
 
         // Create elements with different tags, ids, and classes
         let mut div = create_element("div");
-        div.attributes.insert("id".to_string(), "main".to_string());
-        div.attributes
-            .insert("class".to_string(), "container wrapper".to_string());
+        div.set_attr("id", "main");
+        div.set_attr("class", "container wrapper");
 
         let mut span = create_element("span");
-        span.attributes.insert("id".to_string(), "text".to_string());
-        span.attributes
-            .insert("class".to_string(), "highlight".to_string());
+        span.set_attr("id", "text");
+        span.set_attr("class", "highlight");
 
         div.children.push(Node::Element(span));
         doc.root.children.push(Node::Element(div));
@@ -485,10 +479,7 @@ mod unit_tests {
 
         // Create element with style attribute
         let mut div = create_element("div");
-        div.attributes.insert(
-            "style".to_string(),
-            "  color:  red;  margin:  10px;  ".to_string(),
-        );
+        div.set_attr("style", "  color:  red;  margin:  10px;  ");
         doc.root.children.push(Node::Element(div));
 
         // Apply plugin
@@ -496,7 +487,7 @@ mod unit_tests {
 
         // Check that style attribute was minified
         if let Node::Element(div_elem) = &doc.root.children[0] {
-            let style_attr = div_elem.attributes.get("style").unwrap();
+            let style_attr = div_elem.attr("style").unwrap();
             // Should be smaller and not contain extra spaces
             assert!(style_attr.len() < "  color:  red;  margin:  10px;  ".len());
             assert!(style_attr.contains("red"));
@@ -543,8 +534,7 @@ mod unit_tests {
         group.children.push(Node::Element(style));
 
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("style".to_string(), "fill: green;".to_string());
+        rect.set_attr("style", "fill: green;");
         group.children.push(Node::Element(rect));
 
         doc.root.children.push(Node::Element(group));
@@ -574,7 +564,7 @@ mod unit_tests {
 
             // Check style attribute
             if let Node::Element(rect_elem) = &group_elem.children[1] {
-                let style_attr = rect_elem.attributes.get("style").unwrap();
+                let style_attr = rect_elem.attr("style").unwrap();
                 assert!(style_attr.contains("green"));
             }
         }

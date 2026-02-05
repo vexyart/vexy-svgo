@@ -288,15 +288,9 @@ mod unit_tests {
 
         let mut doc = Document::new();
         doc.root = create_element("svg");
-        doc.root
-            .attributes
-            .insert("onclick".to_string(), "alert('clicked')".to_string());
-        doc.root
-            .attributes
-            .insert("onload".to_string(), "init()".to_string());
-        doc.root
-            .attributes
-            .insert("width".to_string(), "100".to_string());
+        doc.root.set_attr("onclick", "alert('clicked')");
+        doc.root.set_attr("onload", "init()");
+        doc.root.set_attr("width", "100");
 
         // Apply plugin
         plugin.apply(&mut doc).unwrap();
@@ -304,7 +298,7 @@ mod unit_tests {
         // Check that event attributes were removed
         assert!(!doc.root.attributes.contains_key("onclick"));
         assert!(!doc.root.attributes.contains_key("onload"));
-        assert_eq!(doc.root.attributes.get("width"), Some(&"100".to_string()));
+        assert_eq!(doc.root.attr("width"), Some("100"));
     }
 
     #[test]
@@ -316,9 +310,7 @@ mod unit_tests {
 
         // Add anchor with javascript href
         let mut anchor = create_element("a");
-        anchor
-            .attributes
-            .insert("href".to_string(), "javascript:void(0)".to_string());
+        anchor.set_attr("href", "javascript:void(0)");
 
         // Add children to anchor
         anchor.children.push(Node::Text("Click me".to_string()));
@@ -352,10 +344,7 @@ mod unit_tests {
 
         // Add anchor with xlink:href javascript
         let mut anchor = create_element("a");
-        anchor.attributes.insert(
-            "xlink:href".to_string(),
-            "  javascript:alert('test')".to_string(),
-        );
+        anchor.set_attr("xlink:href", "  javascript:alert('test')");
         anchor
             .children
             .push(Node::Element(create_element("circle")));
@@ -380,9 +369,7 @@ mod unit_tests {
 
         // Add anchor with normal href
         let mut anchor = create_element("a");
-        anchor
-            .attributes
-            .insert("href".to_string(), "https://example.com".to_string());
+        anchor.set_attr("href", "https://example.com");
         anchor.children.push(Node::Text("Link".to_string()));
 
         doc.root.children.push(Node::Element(anchor));
@@ -392,10 +379,7 @@ mod unit_tests {
 
         // Check that normal href was preserved
         if let Node::Element(elem) = &doc.root.children[0] {
-            assert_eq!(
-                elem.attributes.get("href"),
-                Some(&"https://example.com".to_string())
-            );
+            assert_eq!(elem.attr("href"), Some("https://example.com"));
             assert_eq!(elem.children.len(), 1); // Text node preserved
         }
     }
@@ -409,9 +393,7 @@ mod unit_tests {
 
         // Create nested structure
         let mut group = create_element("g");
-        group
-            .attributes
-            .insert("onclick".to_string(), "handleClick()".to_string());
+        group.set_attr("onclick", "handleClick()");
 
         let mut script = create_element("script");
         script
@@ -420,8 +402,7 @@ mod unit_tests {
         group.children.push(Node::Element(script));
 
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("onmouseover".to_string(), "highlight()".to_string());
+        rect.set_attr("onmouseover", "highlight()");
         group.children.push(Node::Element(rect));
 
         doc.root.children.push(Node::Element(group));
@@ -448,34 +429,19 @@ mod unit_tests {
         doc.root = create_element("svg");
 
         // Add various event attributes
-        doc.root
-            .attributes
-            .insert("onbegin".to_string(), "startAnim()".to_string()); // animationEvent
-        doc.root
-            .attributes
-            .insert("onzoom".to_string(), "handleZoom()".to_string()); // documentEvent
-        doc.root
-            .attributes
-            .insert("oncopy".to_string(), "handleCopy()".to_string()); // documentElementEvent
-        doc.root
-            .attributes
-            .insert("ondrag".to_string(), "handleDrag()".to_string()); // globalEvent
-        doc.root
-            .attributes
-            .insert("onfocusin".to_string(), "handleFocus()".to_string()); // graphicalEvent
-        doc.root
-            .attributes
-            .insert("viewBox".to_string(), "0 0 100 100".to_string()); // non-event
+        doc.root.set_attr("onbegin", "startAnim()"); // animationEvent
+        doc.root.set_attr("onzoom", "handleZoom()"); // documentEvent
+        doc.root.set_attr("oncopy", "handleCopy()"); // documentElementEvent
+        doc.root.set_attr("ondrag", "handleDrag()"); // globalEvent
+        doc.root.set_attr("onfocusin", "handleFocus()"); // graphicalEvent
+        doc.root.set_attr("viewBox", "0 0 100 100"); // non-event
 
         // Apply plugin
         plugin.apply(&mut doc).unwrap();
 
         // Check that all event attributes were removed
         assert_eq!(doc.root.attributes.len(), 1);
-        assert_eq!(
-            doc.root.attributes.get("viewBox"),
-            Some(&"0 0 100 100".to_string())
-        );
+        assert_eq!(doc.root.attr("viewBox"), Some("0 0 100 100"));
     }
 
     #[test]

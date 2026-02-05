@@ -12,6 +12,7 @@ use anyhow::Result;
 use nalgebra::Matrix3;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::f64::consts::PI;
 use vexy_svgo_core::ast::{Document, Element, Node};
 
@@ -474,7 +475,7 @@ mod tests {
 
     fn create_test_element_with_transform(transform: &str) -> Element {
         let mut attributes = IndexMap::new();
-        attributes.insert("transform".to_string(), transform.to_string());
+        attributes.insert(Cow::Borrowed("transform"), Cow::Owned(transform.to_string()));
         Element {
             name: "rect".into(),
             attributes,

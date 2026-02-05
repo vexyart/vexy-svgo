@@ -17,6 +17,7 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Default editor namespaces to remove
 static EDITOR_NAMESPACES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -244,7 +245,7 @@ impl EditorsNSDataRemovalVisitor {
 }
 
 impl Visitor<'_> for EditorsNSDataRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Process namespace declarations on SVG root
         self.process_namespace_declarations(element);
 
@@ -254,7 +255,7 @@ impl Visitor<'_> for EditorsNSDataRemovalVisitor {
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Remove child elements with editor namespace prefixes
         element.children.retain(|child| {
             if let Node::Element(child_element) = child {
@@ -317,17 +318,12 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with Inkscape namespace
-        doc.root.attributes.insert(
-            "xmlns:inkscape".to_string(),
-            "http://www.inkscape.org/namespaces/inkscape".to_string(),
-        );
+        doc.root.set_attr("xmlns:inkscape", "http://www.inkscape.org/namespaces/inkscape");
 
         // Add element with Inkscape attributes
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("inkscape:label".to_string(), "Layer 1".to_string());
-        rect.attributes
-            .insert("width".to_string(), "100".to_string());
+        rect.set_attr("inkscape:label", "Layer 1");
+        rect.set_attr("width", "100");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -339,7 +335,7 @@ mod unit_tests {
         // Inkscape attribute should be removed
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
             assert!(!rect.attributes.contains_key("inkscape:label"));
-            assert_eq!(rect.attributes.get("width"), Some(&"100".to_string()));
+            assert_eq!(rect.attr("width"), Some("100"));
         }
     }
 
@@ -349,16 +345,11 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with Illustrator namespace
-        doc.root.attributes.insert(
-            "xmlns:i".to_string(),
-            "http://ns.adobe.com/AdobeIllustrator/10.0/".to_string(),
-        );
+        doc.root.set_attr("xmlns:i", "http://ns.adobe.com/AdobeIllustrator/10.0/");
 
         // Add Illustrator-specific element
         let mut ai_element = create_element("i:pgf");
-        ai_element
-            .attributes
-            .insert("id".to_string(), "adobe_illustrator".to_string());
+        ai_element.set_attr("id", "adobe_illustrator");
 
         doc.root.children.push(Node::Element(ai_element));
 
@@ -377,18 +368,9 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with multiple editor namespaces
-        doc.root.attributes.insert(
-            "xmlns:inkscape".to_string(),
-            "http://www.inkscape.org/namespaces/inkscape".to_string(),
-        );
-        doc.root.attributes.insert(
-            "xmlns:sodipodi".to_string(),
-            "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd".to_string(),
-        );
-        doc.root.attributes.insert(
-            "xmlns:sketch".to_string(),
-            "http://www.bohemiancoding.com/sketch/ns".to_string(),
-        );
+        doc.root.set_attr("xmlns:inkscape", "http://www.inkscape.org/namespaces/inkscape");
+        doc.root.set_attr("xmlns:sodipodi", "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd");
+        doc.root.set_attr("xmlns:sketch", "http://www.bohemiancoding.com/sketch/ns");
 
         plugin.apply(&mut doc).unwrap();
 
@@ -407,15 +389,11 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with custom namespace
-        doc.root.attributes.insert(
-            "xmlns:custom".to_string(),
-            "http://custom.editor/ns".to_string(),
-        );
+        doc.root.set_attr("xmlns:custom", "http://custom.editor/ns");
 
         // Add element with custom namespace
         let mut elem = create_element("custom:data");
-        elem.attributes
-            .insert("value".to_string(), "test".to_string());
+        elem.set_attr("value", "test");
 
         doc.root.children.push(Node::Element(elem));
 
@@ -434,32 +412,17 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with standard namespaces
-        doc.root.attributes.insert(
-            "xmlns".to_string(),
-            "http://www.w3.org/2000/svg".to_string(),
-        );
-        doc.root.attributes.insert(
-            "xmlns:xlink".to_string(),
-            "http://www.w3.org/1999/xlink".to_string(),
-        );
+        doc.root.set_attr("xmlns", "http://www.w3.org/2000/svg");
+        doc.root.set_attr("xmlns:xlink", "http://www.w3.org/1999/xlink");
 
         // Add Inkscape namespace to be removed
-        doc.root.attributes.insert(
-            "xmlns:inkscape".to_string(),
-            "http://www.inkscape.org/namespaces/inkscape".to_string(),
-        );
+        doc.root.set_attr("xmlns:inkscape", "http://www.inkscape.org/namespaces/inkscape");
 
         plugin.apply(&mut doc).unwrap();
 
         // Standard namespaces should be preserved
-        assert_eq!(
-            doc.root.attributes.get("xmlns"),
-            Some(&"http://www.w3.org/2000/svg".to_string())
-        );
-        assert_eq!(
-            doc.root.attributes.get("xmlns:xlink"),
-            Some(&"http://www.w3.org/1999/xlink".to_string())
-        );
+        assert_eq!(doc.root.attr("xmlns"), Some("http://www.w3.org/2000/svg"));
+        assert_eq!(doc.root.attr("xmlns:xlink"), Some("http://www.w3.org/1999/xlink"));
 
         // Editor namespace should be removed
         assert!(!doc.root.attributes.contains_key("xmlns:inkscape"));
@@ -471,10 +434,7 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Set up SVG with Inkscape namespace
-        doc.root.attributes.insert(
-            "xmlns:inkscape".to_string(),
-            "http://www.inkscape.org/namespaces/inkscape".to_string(),
-        );
+        doc.root.set_attr("xmlns:inkscape", "http://www.inkscape.org/namespaces/inkscape");
 
         // Create nested structure with mixed elements
         let mut g = create_element("g");

@@ -224,10 +224,7 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that class was added
-        assert_eq!(
-            doc.root.attributes.get("class"),
-            Some(&"myClass".to_string())
-        );
+        assert_eq!(doc.root.attr("class"), Some("myClass"));
     }
 
     #[test]
@@ -249,7 +246,7 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that all classes were added
-        let class_attr = doc.root.attributes.get("class").unwrap();
+        let class_attr = doc.root.attr("class").unwrap();
         let classes: HashSet<&str> = class_attr.split_whitespace().collect();
         assert!(classes.contains("class1"));
         assert!(classes.contains("class2"));
@@ -266,16 +263,13 @@ mod unit_tests {
 
         let mut doc = Document::new();
         doc.root = create_element("svg");
-        doc.root.attributes.insert(
-            "class".to_string(),
-            "existingClass1 existingClass2".to_string(),
-        );
+        doc.root.set_attr("class", "existingClass1 existingClass2");
 
         // Apply plugin
         plugin.apply(&mut doc).unwrap();
 
         // Check that both existing and new classes are present
-        let class_attr = doc.root.attributes.get("class").unwrap();
+        let class_attr = doc.root.attr("class").unwrap();
         let classes: HashSet<&str> = class_attr.split_whitespace().collect();
         assert!(classes.contains("existingClass1"));
         assert!(classes.contains("existingClass2"));
@@ -295,15 +289,13 @@ mod unit_tests {
 
         let mut doc = Document::new();
         doc.root = create_element("svg");
-        doc.root
-            .attributes
-            .insert("class".to_string(), "duplicateClass".to_string());
+        doc.root.set_attr("class", "duplicateClass");
 
         // Apply plugin
         plugin.apply(&mut doc).unwrap();
 
         // Check that duplicate class appears only once
-        let class_attr = doc.root.attributes.get("class").unwrap();
+        let class_attr = doc.root.attr("class").unwrap();
         let classes: Vec<&str> = class_attr.split_whitespace().collect();
         assert_eq!(
             classes.iter().filter(|&&c| c == "duplicateClass").count(),
@@ -345,7 +337,7 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that all classes were added
-        let class_attr = doc.root.attributes.get("class").unwrap();
+        let class_attr = doc.root.attr("class").unwrap();
         let classes: HashSet<&str> = class_attr.split_whitespace().collect();
         assert!(classes.contains("single"));
         assert!(classes.contains("multiple1"));
@@ -367,7 +359,7 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that only valid class was added
-        let class_attr = doc.root.attributes.get("class").unwrap();
+        let class_attr = doc.root.attr("class").unwrap();
         assert_eq!(class_attr, "valid");
     }
 

@@ -1,4 +1,16 @@
+---
+this_file: CHANGELOG.md
+---
+
 # Vexy SVGO Development Changelog
+
+## 2026-02-04 - Parity Verification Attempt
+
+- Ran `target/release/vexy-svgo` on sample SVGs in `testdata/samples/`.
+- Attempted `cargo build --release` failed due to offline crates.io (`svg_metadata`).
+- Attempted JS SVGO install: `npm install --offline` failed (no cache); `npx svgo` timed out (no network).
+- `cargo test --workspace --offline` failed: missing `wee_alloc`.
+- `cargo clippy --workspace --offline` failed: missing `wee_alloc`.
 
 ## 2025-07-25 - Issue #201: SVGO Default Plugin Parity - 100% PARITY ACHIEVED! 🎉
 

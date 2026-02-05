@@ -467,21 +467,21 @@ mod tests {
         let mut doc = create_test_document();
 
         // Add element with ID
-        let mut attrs = IndexMap::new();
-        attrs.insert("id".to_string(), "myId".to_string());
-        doc.root.children.push(Node::Element(Element {
+        let mut rect = Element {
             name: "rect".into(),
-            attributes: attrs,
+            attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
             children: vec![],
-        }));
+        };
+        rect.set_attr("id", "myId");
+        doc.root.children.push(Node::Element(rect));
 
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
 
         // Check that ID was prefixed
         if let Node::Element(rect) = &doc.root.children[0] {
-            assert_eq!(rect.attr("id").map(|s| s.as_str()), Some("prefix__myId"));
+            assert_eq!(rect.attr("id"), Some("prefix__myId"));
         } else {
             panic!("Expected element");
         }
@@ -493,21 +493,21 @@ mod tests {
         let mut doc = create_test_document();
 
         // Add element with href
-        let mut attrs = IndexMap::new();
-        attrs.insert("href".to_string(), "#myTarget".to_string());
-        doc.root.children.push(Node::Element(Element {
+        let mut use_elem = Element {
             name: "use".into(),
-            attributes: attrs,
+            attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
             children: vec![],
-        }));
+        };
+        use_elem.set_attr("href", "#myTarget");
+        doc.root.children.push(Node::Element(use_elem));
 
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
 
         // Check that href was prefixed
         if let Node::Element(use_elem) = &doc.root.children[0] {
-            assert_eq!(use_elem.attr("href").map(|s| s.as_str()), Some("#prefix__myTarget"));
+            assert_eq!(use_elem.attr("href"), Some("#prefix__myTarget"));
         } else {
             panic!("Expected element");
         }
@@ -525,21 +525,21 @@ mod tests {
         let mut doc = create_test_document();
 
         // Add element with ID
-        let mut attrs = IndexMap::new();
-        attrs.insert("id".to_string(), "myId".to_string());
-        doc.root.children.push(Node::Element(Element {
+        let mut rect = Element {
             name: "rect".into(),
-            attributes: attrs,
+            attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
             children: vec![],
-        }));
+        };
+        rect.set_attr("id", "myId");
+        doc.root.children.push(Node::Element(rect));
 
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
 
         // Check that ID was prefixed with custom config
         if let Node::Element(rect) = &doc.root.children[0] {
-            assert_eq!(rect.attr("id").map(|s| s.as_str()), Some("custom_myId"));
+            assert_eq!(rect.attr("id"), Some("custom_myId"));
         } else {
             panic!("Expected element");
         }

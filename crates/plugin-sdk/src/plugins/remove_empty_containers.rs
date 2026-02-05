@@ -15,6 +15,7 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Set of SVG container elements that can be removed when empty
 /// Based on https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
@@ -139,13 +140,13 @@ impl EmptyContainerRemovalVisitor {
 }
 
 impl Visitor<'_> for EmptyContainerRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Track parent hierarchy
         self.parent_stack.push(element.name.to_string());
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Remove empty container children
         element.children.retain(|child| {
             if let Node::Element(child_element) = child {
@@ -241,9 +242,7 @@ mod unit_tests {
 
         // Add empty pattern with attributes
         let mut pattern = create_element("pattern");
-        pattern
-            .attributes
-            .insert("id".to_string(), "mypattern".to_string());
+        pattern.set_attr("id", "mypattern");
         doc.root.children.push(Node::Element(pattern));
 
         plugin.apply(&mut doc).unwrap();
@@ -262,8 +261,7 @@ mod unit_tests {
 
         // Add empty mask with ID
         let mut mask = create_element("mask");
-        mask.attributes
-            .insert("id".to_string(), "mymask".to_string());
+        mask.set_attr("id", "mymask");
         doc.root.children.push(Node::Element(mask));
 
         plugin.apply(&mut doc).unwrap();
@@ -282,8 +280,7 @@ mod unit_tests {
 
         // Add empty g with filter
         let mut g = create_element("g");
-        g.attributes
-            .insert("filter".to_string(), "url(#myfilter)".to_string());
+        g.set_attr("filter", "url(#myfilter)");
         doc.root.children.push(Node::Element(g));
 
         plugin.apply(&mut doc).unwrap();

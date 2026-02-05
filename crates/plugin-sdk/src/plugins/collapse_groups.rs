@@ -12,6 +12,7 @@ use anyhow::Result;
 use std::collections::HashSet;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Plugin that collapses unnecessary group elements
 #[derive(Default)]
@@ -250,7 +251,7 @@ impl GroupCollapseVisitor {
 }
 
 impl Visitor<'_> for GroupCollapseVisitor {
-    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Process from bottom up - children are already processed
         let mut indices_to_replace = Vec::new();
 
@@ -295,9 +296,7 @@ mod tests {
     fn create_element_with_attrs(name: &'static str, attrs: &[(&str, &str)]) -> Element<'static> {
         let mut element = create_element(name);
         for (key, value) in attrs {
-            element
-                .attributes
-                .insert(key.to_string(), value.to_string());
+            element.set_attr(*key, *value);
         }
         element
     }
@@ -382,8 +381,8 @@ mod tests {
 
         CollapseGroupsPlugin::move_attributes(&group, &mut child);
 
-        assert_eq!(child.attributes.get("fill"), Some(&"red".to_string()));
-        assert_eq!(child.attributes.get("stroke"), Some(&"blue".to_string()));
+        assert_eq!(child.attr("fill"), Some("red"));
+        assert_eq!(child.attr("stroke"), Some("blue"));
     }
 
     #[test]
@@ -393,10 +392,7 @@ mod tests {
 
         CollapseGroupsPlugin::move_attributes(&group, &mut child);
 
-        assert_eq!(
-            child.attributes.get("transform"),
-            Some(&"translate(10,10) scale(2)".to_string())
-        );
+        assert_eq!(child.attr("transform"), Some("translate(10,10) scale(2)"));
     }
 
     #[test]
@@ -407,7 +403,7 @@ mod tests {
         CollapseGroupsPlugin::move_attributes(&group, &mut child);
 
         // inherit should be replaced with parent's value
-        assert_eq!(child.attributes.get("fill"), Some(&"red".to_string()));
+        assert_eq!(child.attr("fill"), Some("red"));
     }
 
     #[test]
@@ -481,8 +477,8 @@ mod tests {
         assert_eq!(doc.root.children.len(), 1);
         if let Node::Element(element) = &doc.root.children[0] {
             assert_eq!(element.name.as_ref(), "rect");
-            assert_eq!(element.attributes.get("fill"), Some(&"red".to_string()));
-            assert_eq!(element.attributes.get("stroke"), Some(&"blue".to_string()));
+            assert_eq!(element.attr("fill"), Some("red"));
+            assert_eq!(element.attr("stroke"), Some("blue"));
         }
     }
 
@@ -505,7 +501,7 @@ mod tests {
         if let Node::Element(element) = &doc.root.children[0] {
             assert_eq!(element.name.as_ref(), "g");
             assert_eq!(element.children.len(), 2);
-            assert_eq!(element.attributes.get("fill"), Some(&"red".to_string()));
+            assert_eq!(element.attr("fill"), Some("red"));
         }
     }
 }

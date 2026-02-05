@@ -381,28 +381,20 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add attributes to root element for testing
-        doc.root
-            .attributes
-            .insert("width".to_string(), "100.12345px".to_string());
-        doc.root
-            .attributes
-            .insert("height".to_string(), "50.00000".to_string());
-        doc.root
-            .attributes
-            .insert("transform".to_string(), "scale(1.23456789)".to_string());
-        doc.root
-            .attributes
-            .insert("style".to_string(), "stroke-width: 2.50000px".to_string());
+        doc.root.set_attr("width", "100.12345px");
+        doc.root.set_attr("height", "50.00000");
+        doc.root.set_attr("transform", "scale(1.23456789)");
+        doc.root.set_attr("style", "stroke-width: 2.50000px");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
 
         // Check that values were cleaned
-        assert_eq!(doc.root.attributes.get("width").unwrap(), "100.123");
-        assert_eq!(doc.root.attributes.get("height").unwrap(), "50");
-        assert_eq!(doc.root.attributes.get("transform").unwrap(), "scale(1.235)");
-        assert_eq!(doc.root.attributes.get("style").unwrap(), "stroke-width: 2.5");
+        assert_eq!(doc.root.attr("width"), Some("100.123"));
+        assert_eq!(doc.root.attr("height"), Some("50"));
+        assert_eq!(doc.root.attr("transform"), Some("scale(1.235)"));
+        assert_eq!(doc.root.attr("style"), Some("stroke-width: 2.5"));
     }
 }
 

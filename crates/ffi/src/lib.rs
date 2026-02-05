@@ -7,6 +7,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
+use vexy_svgo_core::{Config, optimize_with_config};
 
 /// Error codes for FFI operations
 #[repr(C)]
@@ -52,7 +53,7 @@ fn create_error_result(code: VexyErrorCode, message: &str) -> VexyResult {
         Err(_) => ptr::null_mut(),
     };
 
-    VexySvgoResult {
+    VexyResult {
         error_code: code,
         data: ptr::null_mut(),
         data_length: 0,
@@ -68,8 +69,8 @@ fn create_success_result(data: String, original_size: usize) -> VexyResult {
     match CString::new(data) {
         Ok(c_string) => {
             let raw_ptr = c_string.into_raw();
-            VexySvgoResult {
-                error_code: VexySvgoErrorCode::Success,
+            VexyResult {
+                error_code: VexyErrorCode::Success,
                 data: raw_ptr,
                 data_length: optimized_size,
                 original_size,
@@ -78,7 +79,7 @@ fn create_success_result(data: String, original_size: usize) -> VexyResult {
             }
         }
         Err(_) => create_error_result(
-            VexySvgoErrorCode::MemoryError,
+            VexyErrorCode::MemoryError,
             "Failed to convert result to C string",
         ),
     }
@@ -93,14 +94,14 @@ fn create_success_result(data: String, original_size: usize) -> VexyResult {
 #[no_mangle]
 pub unsafe extern "C" fn vexy_svgo_optimize_default(svg_input: *const c_char) -> VexyResult {
     if svg_input.is_null() {
-        return create_error_result(VexySvgoErrorCode::InvalidInput, "Input SVG is null");
+        return create_error_result(VexyErrorCode::InvalidInput, "Input SVG is null");
     }
 
     let svg_str = match CStr::from_ptr(svg_input).to_str() {
         Ok(s) => s,
         Err(_) => {
             return create_error_result(
-                VexySvgoErrorCode::InvalidInput,
+                VexyErrorCode::InvalidInput,
                 "Invalid UTF-8 in input SVG",
             )
         }
@@ -111,7 +112,7 @@ pub unsafe extern "C" fn vexy_svgo_optimize_default(svg_input: *const c_char) ->
 
     match optimize_with_config(svg_str, config) {
         Ok(result) => create_success_result(result.data, original_size),
-        Err(e) => create_error_result(VexySvgoErrorCode::OptimizationError, &e.to_string()),
+        Err(e) => create_error_result(VexyErrorCode::OptimizationError, &e.to_string()),
     }
 }
 
@@ -127,14 +128,14 @@ pub unsafe extern "C" fn vexy_svgo_optimize_with_config(
     config_json: *const c_char,
 ) -> VexyResult {
     if svg_input.is_null() {
-        return create_error_result(VexySvgoErrorCode::InvalidInput, "Input SVG is null");
+        return create_error_result(VexyErrorCode::InvalidInput, "Input SVG is null");
     }
 
     let svg_str = match CStr::from_ptr(svg_input).to_str() {
         Ok(s) => s,
         Err(_) => {
             return create_error_result(
-                VexySvgoErrorCode::InvalidInput,
+                VexyErrorCode::InvalidInput,
                 "Invalid UTF-8 in input SVG",
             )
         }
@@ -150,7 +151,7 @@ pub unsafe extern "C" fn vexy_svgo_optimize_with_config(
             Ok(s) => s,
             Err(_) => {
                 return create_error_result(
-                    VexySvgoErrorCode::InvalidInput,
+                    VexyErrorCode::InvalidInput,
                     "Invalid UTF-8 in config JSON",
                 )
             }
@@ -160,7 +161,7 @@ pub unsafe extern "C" fn vexy_svgo_optimize_with_config(
             Ok(c) => c,
             Err(e) => {
                 return create_error_result(
-                    VexySvgoErrorCode::ConfigError,
+                    VexyErrorCode::ConfigError,
                     &format!("Invalid config JSON: {e}"),
                 )
             }
@@ -169,7 +170,7 @@ pub unsafe extern "C" fn vexy_svgo_optimize_with_config(
 
     match optimize_with_config(svg_str, config) {
         Ok(result) => create_success_result(result.data, original_size),
-        Err(e) => create_error_result(VexySvgoErrorCode::OptimizationError, &e.to_string()),
+        Err(e) => create_error_result(VexyErrorCode::OptimizationError, &e.to_string()),
     }
 }
 
@@ -259,7 +260,7 @@ mod tests {
         let svg = CString::new("<svg><circle r=\"10\"/></svg>").unwrap();
         let result = unsafe { vexy_svgo_optimize_default(svg.as_ptr()) };
 
-        assert!(matches!(result.error_code, VexySvgoErrorCode::Success));
+        assert!(matches!(result.error_code, VexyErrorCode::Success));
         assert!(!result.data.is_null());
         assert!(result.data_length > 0);
 
@@ -284,7 +285,7 @@ mod tests {
     #[test]
     fn test_ffi_invalid_input() {
         let result = unsafe { vexy_svgo_optimize_default(ptr::null()) };
-        assert!(matches!(result.error_code, VexySvgoErrorCode::InvalidInput));
+        assert!(matches!(result.error_code, VexyErrorCode::InvalidInput));
         assert!(!result.error_message.is_null());
 
         unsafe {

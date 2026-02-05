@@ -248,6 +248,31 @@ impl Config {
             }
         }
     }
+
+    /// Configure plugin parameters
+    pub fn configure_plugin(&mut self, name: &str, params: serde_json::Value) {
+        for plugin in &mut self.plugins {
+            if plugin.name() == name {
+                match plugin {
+                    PluginConfig::Name(plugin_name) => {
+                        *plugin = PluginConfig::WithParams {
+                            name: plugin_name.clone(),
+                            params,
+                        };
+                    }
+                    PluginConfig::WithParams { params: existing_params, .. } => {
+                        *existing_params = params;
+                    }
+                }
+                return;
+            }
+        }
+        // If plugin not found, add it with params
+        self.plugins.push(PluginConfig::WithParams {
+            name: name.to_string(),
+            params,
+        });
+    }
 }
 
 impl PluginConfig {

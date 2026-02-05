@@ -10,6 +10,7 @@ use crate::Plugin;
 use anyhow::Result;
 use vexy_svgo_core::ast::{Document, Element};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Plugin that removes empty attributes from SVG elements
 #[derive(Default)]
@@ -97,7 +98,7 @@ impl EmptyAttrRemovalVisitor {
 }
 
 impl Visitor<'_> for EmptyAttrRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Remove empty attributes from the element
         element.attributes.retain(|name, value| {
             // Keep non-empty attributes
@@ -183,18 +184,10 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add attributes to root element for testing
-        doc.root
-            .attributes
-            .insert("fill".to_string(), "red".to_string());
-        doc.root
-            .attributes
-            .insert("stroke".to_string(), "".to_string());
-        doc.root
-            .attributes
-            .insert("opacity".to_string(), "  ".to_string());
-        doc.root
-            .attributes
-            .insert("class".to_string(), "".to_string());
+        doc.root.set_attr("fill", "red");
+        doc.root.set_attr("stroke", "");
+        doc.root.set_attr("opacity", "  ");
+        doc.root.set_attr("class", "");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);
@@ -213,16 +206,10 @@ mod unit_tests {
         let mut doc = Document::new();
 
         // Add attributes to root element for testing
-        doc.root
-            .attributes
-            .insert("fill".to_string(), "red".to_string());
-        doc.root
-            .attributes
-            .insert("stroke".to_string(), "".to_string());
-        doc.root
-            .attributes
-            .insert("class".to_string(), "".to_string());
-        doc.root.attributes.insert("id".to_string(), "".to_string());
+        doc.root.set_attr("fill", "red");
+        doc.root.set_attr("stroke", "");
+        doc.root.set_attr("class", "");
+        doc.root.set_attr("id", "");
 
         // Apply the plugin
         let result = plugin.apply(&mut doc);

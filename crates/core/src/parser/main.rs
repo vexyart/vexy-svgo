@@ -36,7 +36,7 @@ impl Parser {
     pub fn new() -> Self {
         Self {
             preserve_whitespace: false,
-            preserve_comments: false,
+            preserve_comments: true,
             expand_entities: true,
             streaming_config: StreamingConfig::default(),
         }
@@ -46,7 +46,7 @@ impl Parser {
     pub fn with_streaming_config(config: StreamingConfig) -> Self {
         Self {
             preserve_whitespace: false,
-            preserve_comments: false,
+            preserve_comments: true,
             expand_entities: true,
             streaming_config: config,
         }

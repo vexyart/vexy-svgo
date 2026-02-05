@@ -1,6 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
-  <style type="text/css">
+<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><style type="text/css">
     /* Test various CSS properties */
     .fill-test { fill: #ff0000; }
     .stroke-test { stroke: #00ff00; stroke-width: 3px; }
@@ -19,17 +17,4 @@
       stroke-width: 2px;
       opacity: 0.8;
     }
-  </style>
-  
-  <!-- Elements to test -->
-  <rect class="fill-test" x="10" y="10" width="40" height="40"/>
-  <rect class="stroke-test" x="60" y="10" width="40" height="40"/>
-  <rect class="opacity-test" x="110" y="10" width="40" height="40"/>
-  <text class="font-test" x="10" y="80">Test Text</text>
-  
-  <rect x="10" y="100" width="40" height="40"/>
-  <rect id="special" x="60" y="100" width="40" height="40"/>
-  <circle class="blue" cx="130" cy="120" r="20"/>
-  
-  <ellipse class="multi" cx="50" cy="170" rx="30" ry="20"/>
-</svg>
+  </style><rect class="fill-test" x="10" y="10" width="40" height="40"/><rect class="stroke-test" x="60" y="10" width="40" height="40"/><rect class="opacity-test" x="110" y="10" width="40" height="40"/><text class="font-test" x="10" y="80">Test Text</text><rect x="10" y="100" width="40" height="40"/><rect id="special" x="60" y="100" width="40" height="40"/><circle class="blue" cx="130" cy="120" r="20"/><ellipse class="multi" cx="50" cy="170" rx="30" ry="20"/></svg>

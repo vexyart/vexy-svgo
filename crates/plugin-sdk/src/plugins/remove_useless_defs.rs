@@ -10,6 +10,7 @@ use crate::Plugin;
 use anyhow::Result;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Plugin that removes useless definitions from SVG documents
 #[derive(Default)]
@@ -132,7 +133,7 @@ impl UselessDefsRemovalVisitor {
 }
 
 impl Visitor<'_> for UselessDefsRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Process elements that should be filtered
         if RemoveUselessDefsPlugin::should_process_element(element) {
             // Collect useful nodes from children, applying flattening

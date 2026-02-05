@@ -167,16 +167,12 @@ mod unit_tests {
 
         // Add JPEG image
         let mut image = create_element("image");
-        image
-            .attributes
-            .insert("xlink:href".to_string(), "photo.jpg".to_string());
+        image.set_attr("xlink:href", "photo.jpg");
         doc.root.children.push(Node::Element(image));
 
         // Add SVG image (should be preserved)
         let mut svg_image = create_element("image");
-        svg_image
-            .attributes
-            .insert("xlink:href".to_string(), "icon.svg".to_string());
+        svg_image.set_attr("xlink:href", "icon.svg");
         doc.root.children.push(Node::Element(svg_image));
 
         // Apply plugin
@@ -185,10 +181,7 @@ mod unit_tests {
         // Check that only SVG image remains
         assert_eq!(doc.root.children.len(), 1);
         if let Node::Element(elem) = &doc.root.children[0] {
-            assert_eq!(
-                elem.attributes.get("xlink:href"),
-                Some(&"icon.svg".to_string())
-            );
+            assert_eq!(elem.attr("xlink:href"), Some("icon.svg"));
         }
     }
 
@@ -201,9 +194,7 @@ mod unit_tests {
 
         // Add PNG image
         let mut image = create_element("image");
-        image
-            .attributes
-            .insert("xlink:href".to_string(), "logo.png".to_string());
+        image.set_attr("xlink:href", "logo.png");
         doc.root.children.push(Node::Element(image));
 
         // Apply plugin
@@ -222,9 +213,7 @@ mod unit_tests {
 
         // Add GIF image
         let mut image = create_element("image");
-        image
-            .attributes
-            .insert("xlink:href".to_string(), "animation.gif".to_string());
+        image.set_attr("xlink:href", "animation.gif");
         doc.root.children.push(Node::Element(image));
 
         // Apply plugin
@@ -243,18 +232,12 @@ mod unit_tests {
 
         // Add data URI JPEG
         let mut image1 = create_element("image");
-        image1.attributes.insert(
-            "xlink:href".to_string(),
-            "data:image/jpeg;base64,/9j/4AAQ...".to_string(),
-        );
+        image1.set_attr("xlink:href", "data:image/jpeg;base64,/9j/4AAQ...");
         doc.root.children.push(Node::Element(image1));
 
         // Add data URI PNG
         let mut image2 = create_element("image");
-        image2.attributes.insert(
-            "xlink:href".to_string(),
-            "data:image/png;base64,iVBORw0KGg...".to_string(),
-        );
+        image2.set_attr("xlink:href", "data:image/png;base64,iVBORw0KGg...");
         doc.root.children.push(Node::Element(image2));
 
         // Apply plugin
@@ -273,9 +256,7 @@ mod unit_tests {
 
         // Add image with SVG2 href attribute
         let mut image = create_element("image");
-        image
-            .attributes
-            .insert("href".to_string(), "picture.jpeg".to_string());
+        image.set_attr("href", "picture.jpeg");
         doc.root.children.push(Node::Element(image));
 
         // Apply plugin
@@ -294,22 +275,15 @@ mod unit_tests {
 
         // Add various vector image formats
         let mut svg_image = create_element("image");
-        svg_image
-            .attributes
-            .insert("xlink:href".to_string(), "vector.svg".to_string());
+        svg_image.set_attr("xlink:href", "vector.svg");
         doc.root.children.push(Node::Element(svg_image));
 
         let mut pdf_image = create_element("image");
-        pdf_image
-            .attributes
-            .insert("xlink:href".to_string(), "document.pdf".to_string());
+        pdf_image.set_attr("xlink:href", "document.pdf");
         doc.root.children.push(Node::Element(pdf_image));
 
         let mut data_svg = create_element("image");
-        data_svg.attributes.insert(
-            "xlink:href".to_string(),
-            "data:image/svg+xml;base64,PHN2Zy...".to_string(),
-        );
+        data_svg.set_attr("xlink:href", "data:image/svg+xml;base64,PHN2Zy...");
         doc.root.children.push(Node::Element(data_svg));
 
         // Apply plugin
@@ -330,9 +304,7 @@ mod unit_tests {
         let mut group = create_element("g");
 
         let mut image1 = create_element("image");
-        image1
-            .attributes
-            .insert("xlink:href".to_string(), "nested.jpg".to_string());
+        image1.set_attr("xlink:href", "nested.jpg");
         group.children.push(Node::Element(image1));
 
         let rect = create_element("rect");
@@ -341,9 +313,7 @@ mod unit_tests {
         let mut defs = create_element("defs");
         let mut pattern = create_element("pattern");
         let mut image2 = create_element("image");
-        image2
-            .attributes
-            .insert("href".to_string(), "pattern.png".to_string());
+        image2.set_attr("href", "pattern.png");
         pattern.children.push(Node::Element(image2));
         defs.children.push(Node::Element(pattern));
         group.children.push(Node::Element(defs));
@@ -378,15 +348,11 @@ mod unit_tests {
 
         // Add elements with raster-like hrefs that aren't images
         let mut use_elem = create_element("use");
-        use_elem
-            .attributes
-            .insert("xlink:href".to_string(), "icon.png".to_string());
+        use_elem.set_attr("xlink:href", "icon.png");
         doc.root.children.push(Node::Element(use_elem));
 
         let mut a_elem = create_element("a");
-        a_elem
-            .attributes
-            .insert("href".to_string(), "photo.jpg".to_string());
+        a_elem.set_attr("href", "photo.jpg");
         doc.root.children.push(Node::Element(a_elem));
 
         // Apply plugin

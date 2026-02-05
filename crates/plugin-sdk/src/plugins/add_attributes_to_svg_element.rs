@@ -214,7 +214,7 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that attribute was added with empty value
-        assert_eq!(doc.root.attributes.get("myAttribute"), Some(&String::new()));
+        assert_eq!(doc.root.attr("myAttribute"), Some(""));
     }
 
     #[test]
@@ -236,11 +236,8 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that attributes were added
-        assert_eq!(
-            doc.root.attributes.get("data-name"),
-            Some(&"myValue".to_string())
-        );
-        assert_eq!(doc.root.attributes.get("data-id"), Some(&"123".to_string()));
+        assert_eq!(doc.root.attr("data-name"), Some("myValue"));
+        assert_eq!(doc.root.attr("data-id"), Some("123"));
     }
 
     #[test]
@@ -265,12 +262,9 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that all attributes were added
-        assert_eq!(doc.root.attributes.get("class"), Some(&String::new()));
-        assert_eq!(doc.root.attributes.get("id"), Some(&String::new()));
-        assert_eq!(
-            doc.root.attributes.get("data-test"),
-            Some(&"value".to_string())
-        );
+        assert_eq!(doc.root.attr("class"), Some(""));
+        assert_eq!(doc.root.attr("id"), Some(""));
+        assert_eq!(doc.root.attr("data-test"), Some("value"));
     }
 
     #[test]
@@ -283,18 +277,13 @@ mod unit_tests {
 
         let mut doc = Document::new();
         doc.root = create_element("svg");
-        doc.root
-            .attributes
-            .insert("class".to_string(), "existing-class".to_string());
+        doc.root.set_attr("class", "existing-class");
 
         // Apply plugin
         plugin.apply(&mut doc).unwrap();
 
         // Check that existing attribute was not overridden
-        assert_eq!(
-            doc.root.attributes.get("class"),
-            Some(&"existing-class".to_string())
-        );
+        assert_eq!(doc.root.attr("class"), Some("existing-class"));
     }
 
     #[test]
@@ -336,12 +325,9 @@ mod unit_tests {
         plugin.apply(&mut doc).unwrap();
 
         // Check that all attributes were added
-        assert_eq!(doc.root.attributes.get("single"), Some(&String::new()));
-        assert_eq!(doc.root.attributes.get("multiple"), Some(&String::new()));
-        assert_eq!(
-            doc.root.attributes.get("data-value"),
-            Some(&"test".to_string())
-        );
+        assert_eq!(doc.root.attr("single"), Some(""));
+        assert_eq!(doc.root.attr("multiple"), Some(""));
+        assert_eq!(doc.root.attr("data-value"), Some("test"));
     }
 
     #[test]

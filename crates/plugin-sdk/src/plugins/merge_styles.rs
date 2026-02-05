@@ -339,9 +339,7 @@ mod unit_tests {
 
         // Create style with media attribute
         let mut style1 = create_element("style");
-        style1
-            .attributes
-            .insert("media".to_string(), "print".to_string());
+        style1.set_attr("media", "print");
         style1.children.push(Node::Text(".a{fill:red}".to_string()));
 
         // Create regular style
@@ -401,9 +399,7 @@ mod unit_tests {
 
         // Create style with invalid type
         let mut invalid_style = create_element("style");
-        invalid_style
-            .attributes
-            .insert("type".to_string(), "text/javascript".to_string());
+        invalid_style.set_attr("type", "text/javascript");
         invalid_style
             .children
             .push(Node::Text("console.log('test')".to_string()));
@@ -431,14 +427,12 @@ mod unit_tests {
 
         // Create style with empty type
         let mut style1 = create_element("style");
-        style1.attributes.insert("type".to_string(), "".to_string());
+        style1.set_attr("type", "");
         style1.children.push(Node::Text(".a{fill:red}".to_string()));
 
         // Create style with text/css type
         let mut style2 = create_element("style");
-        style2
-            .attributes
-            .insert("type".to_string(), "text/css".to_string());
+        style2.set_attr("type", "text/css");
         style2
             .children
             .push(Node::Text(".b{fill:blue}".to_string()));

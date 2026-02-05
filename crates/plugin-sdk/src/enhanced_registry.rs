@@ -12,7 +12,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use crate::error::VexyError;
+use vexy_svgo_core::error::VexyError;
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -231,14 +232,14 @@ impl EnhancedPluginRegistry {
         
         // Check if experimental plugins are allowed
         if is_experimental && !self.config.allow_experimental {
-            return Err(anyhow!("Experimental plugin '{}' not allowed", plugin_name));
+            return Err(VexyError::General(format!("Experimental plugin '{}' not allowed", plugin_name)).into());
         }
         
         // Check for name conflicts
         {
             let factories = self.factories.read().unwrap();
             if factories.contains_key(&plugin_name) {
-                return Err(anyhow!("Plugin '{}' already registered", plugin_name));
+                return Err(VexyError::General(format!("Plugin '{}' already registered", plugin_name)).into());
             }
         }
         
@@ -274,7 +275,7 @@ impl EnhancedPluginRegistry {
         let factory = {
             let factories = self.factories.read().unwrap();
             factories.get(&resolved_name)
-                .ok_or_else(|| anyhow!("Plugin '{}' not found", name))?
+                .ok_or_else(|| VexyError::General(format!("Plugin '{}' not found", name)))?
                 .clone()
         };
         
@@ -312,7 +313,7 @@ impl EnhancedPluginRegistry {
         {
             let factories = self.factories.read().unwrap();
             if !factories.contains_key(plugin_name) {
-                return Err(anyhow!("Plugin '{}' not found", plugin_name));
+                return Err(VexyError::General(format!("Plugin '{}' not found", plugin_name)).into());
             }
         }
         
@@ -354,7 +355,7 @@ impl EnhancedPluginRegistry {
     /// Check plugin dependencies
     pub fn check_dependencies(&self, plugin_name: &str) -> Result<Vec<String>, VexyError> {
         let metadata = self.get_metadata(plugin_name)
-            .ok_or_else(|| anyhow!("Plugin '{}' not found", plugin_name))?;
+            .ok_or_else(|| VexyError::General(format!("Plugin '{}' not found", plugin_name)))?;
         
         let mut missing_deps = Vec::new();
         
@@ -367,7 +368,7 @@ impl EnhancedPluginRegistry {
         if missing_deps.is_empty() {
             Ok(missing_deps)
         } else {
-            Err(anyhow!("Missing dependencies: {}", missing_deps.join(", ")))
+            Err(VexyError::General(format!("Missing dependencies: {}", missing_deps.join(", "))))
         }
     }
 
@@ -443,7 +444,7 @@ impl EnhancedPluginRegistry {
         if invalid_plugins.is_empty() {
             Ok(invalid_plugins)
         } else {
-            Err(anyhow!("Invalid plugins found: {}", invalid_plugins.join(", ")))
+            Err(VexyError::General(format!("Invalid plugins found: {}", invalid_plugins.join(", "))))
         }
     }
 
@@ -471,7 +472,7 @@ impl EnhancedPluginRegistry {
         }
         
         if visiting.contains(name) {
-            return Err(anyhow!("Circular dependency detected involving '{}'", name));
+            return Err(VexyError::General(format!("Circular dependency detected involving '{}'", name)).into());
         }
         
         visiting.insert(name.to_string());

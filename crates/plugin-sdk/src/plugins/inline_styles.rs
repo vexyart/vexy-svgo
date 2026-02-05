@@ -26,6 +26,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Configuration parameters for inline styles plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -398,7 +399,7 @@ impl InlineStylesVisitor {
 }
 
 impl Visitor<'_> for InlineStylesVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         self.element_counter += 1;
 
         // Collect style elements
@@ -424,7 +425,7 @@ struct StyleApplierVisitor<'a> {
 }
 
 impl Visitor<'_> for StyleApplierVisitor<'_> {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         if element.name != "style" {
             self.visitor.apply_styles_to_element(element);
         }
@@ -440,7 +441,7 @@ struct StyleCleanerVisitor<'a> {
 }
 
 impl Visitor<'_> for StyleCleanerVisitor<'_> {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         if element.name == "style" && self.config.remove_matched_selectors {
             // For now, remove all text content from style elements
             // In a full implementation, we'd selectively remove only used selectors
@@ -629,15 +630,14 @@ mod unit_tests {
 
         // Add an element with the class
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("class".to_string(), "test".to_string());
+        rect.set_attr("class", "test");
         doc.root.children.push(Node::Element(rect));
 
         plugin.apply(&mut doc).unwrap();
 
         // Check that the style was inlined
         if let Some(Node::Element(rect)) = doc.root.children.get(1) {
-            assert_eq!(rect.attributes.get("style"), Some(&"fill: red".to_string()));
+            assert_eq!(rect.attr("style"), Some("fill: red"));
         }
     }
 
@@ -652,19 +652,14 @@ mod unit_tests {
 
         // Add an element with the ID
         let mut circle = create_element("circle");
-        circle
-            .attributes
-            .insert("id".to_string(), "myid".to_string());
+        circle.set_attr("id", "myid");
         doc.root.children.push(Node::Element(circle));
 
         plugin.apply(&mut doc).unwrap();
 
         // Check that the style was inlined
         if let Some(Node::Element(circle)) = doc.root.children.get(1) {
-            assert_eq!(
-                circle.attributes.get("style"),
-                Some(&"stroke: #00f".to_string())
-            );
+            assert_eq!(circle.attr("style"), Some("stroke: #00f"));
         }
     }
 

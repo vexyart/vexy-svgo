@@ -251,8 +251,7 @@ mod unit_tests {
 
         // Add element with style attribute
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("style".to_string(), "fill: red; stroke: blue;".to_string());
+        rect.set_attr("style", "fill: red; stroke: blue;");
         doc.root.children.push(Node::Element(rect));
 
         // Add style element
@@ -269,10 +268,7 @@ mod unit_tests {
         assert_eq!(doc.root.children.len(), 1);
         if let Node::Element(elem) = &doc.root.children[0] {
             assert_eq!(elem.name, "rect");
-            assert_eq!(
-                elem.attributes.get("style"),
-                Some(&"fill: red; stroke: blue;".to_string())
-            );
+            assert_eq!(elem.attr("style"), Some("fill: red; stroke: blue;"));
         }
     }
 
@@ -324,12 +320,8 @@ mod unit_tests {
 
         // Add style element with attributes
         let mut style = create_element("style");
-        style
-            .attributes
-            .insert("type".to_string(), "text/css".to_string());
-        style
-            .attributes
-            .insert("media".to_string(), "screen".to_string());
+        style.set_attr("type", "text/css");
+        style.set_attr("media", "screen");
         style.children.push(Node::Text(
             "@media print { .no-print { display: none; } }".to_string(),
         ));

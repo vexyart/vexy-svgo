@@ -1,0 +1,5 @@
+# Ralphy Progress Log
+
+- [✓] 2026-02-04 22:36 - ulw: Solve all items in ./TASKS.md and ./TODO.md. Log progress in ./WORK.md. Examine, verify, and mark verified+solved items with [x]. Commit regularly. DON’T ASK, JUST DO. Once you’ve REALLY solved ALL items, say ’ALL IS SOLVED’ in all caps, and start solving next problems
+- [✓] 2026-02-05 00:18 - ulw: Read ./CLAUDE.md and solve all items in ./TASKS.md & ./TODO.md. Log progress in ./WORK.md. Examine, verify, and mark verified+solved items with [x]. Commit regularly. DON’T ASK, JUST DO. Once you’ve REALLY solved ALL items, say ’ALL IS SOLVED’ in all caps, and start solving next problems
+- [✓] 2026-02-05 12:57 - ulw: Read ./CLAUDE.md and solve all items in ./TASKS.md & ./TODO.md. Log progress in ./WORK.md. Examine, verify, and mark verified+solved items with [x]. Commit regularly. DON’T ASK, JUST DO. Once you’ve REALLY solved ALL items, say ’ALL IS SOLVED’ in all caps, and start solving next problems

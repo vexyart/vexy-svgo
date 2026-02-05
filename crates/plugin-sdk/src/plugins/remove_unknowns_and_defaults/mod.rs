@@ -7,6 +7,7 @@ use crate::Plugin;
 use anyhow::Result;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 use self::default_attrs::should_remove_attribute;
 use self::unknown_elements::should_remove_unknown_element;
@@ -127,7 +128,7 @@ impl UnknownsAndDefaultsRemovalVisitor {
 }
 
 impl Visitor<'_> for UnknownsAndDefaultsRemovalVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Push current element to stack
         self.element_stack.push(element.name.to_string());
 
@@ -153,7 +154,7 @@ impl Visitor<'_> for UnknownsAndDefaultsRemovalVisitor {
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Pop current element from stack
         self.element_stack.pop();
 
@@ -189,9 +190,7 @@ mod tests {
     fn create_element_with_attrs(name: &'static str, attrs: &[(&str, &str)]) -> Element<'static> {
         let mut element = create_element(name);
         for (key, value) in attrs {
-            element
-                .attributes
-                .insert(Cow::Borrowed(key), Cow::Borrowed(value));
+            element.set_attr(*key, *value);
         }
         element
     }

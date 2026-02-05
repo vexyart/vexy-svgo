@@ -251,9 +251,7 @@ mod unit_tests {
 
         // Add tref with empty xlink:href
         let mut tref_empty = create_element("tref");
-        tref_empty
-            .attributes
-            .insert("xlink:href".to_string(), "".to_string());
+        tref_empty.set_attr("xlink:href", "");
         doc.root.children.push(Node::Element(tref_empty));
 
         // Add tref with no xlink:href
@@ -262,9 +260,7 @@ mod unit_tests {
 
         // Add tref with valid xlink:href
         let mut tref_valid = create_element("tref");
-        tref_valid
-            .attributes
-            .insert("xlink:href".to_string(), "#validref".to_string());
+        tref_valid.set_attr("xlink:href", "#validref");
         doc.root.children.push(Node::Element(tref_valid));
 
         // Apply plugin
@@ -339,9 +335,7 @@ mod unit_tests {
 
         // Add tref with empty xlink:href
         let mut tref_empty = create_element("tref");
-        tref_empty
-            .attributes
-            .insert("xlink:href".to_string(), "".to_string());
+        tref_empty.set_attr("xlink:href", "");
         doc.root.children.push(Node::Element(tref_empty));
 
         // Apply plugin

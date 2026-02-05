@@ -1,295 +1,347 @@
-# Claude Development Guide for vexy_svgo
+# Development guidelines
 
-This document provides the necessary context and guidelines for developing `vexy_svgo`, a high-performance SVG optimizer written in Rust. It is an API-compatible port of the popular Node.js-based tool, `svgo`.
+## Foundation: Challenge your first instinct with chain-of-thought
 
-## 1. Project Overview
+Before you generate any response, assume your first instinct is wrong. Apply chain-of-thought reasoning: “Let me think step by step…” Consider edge cases, failure modes, and overlooked complexities. Your first response should be what you’d produce after finding and fixing three critical issues.
 
-`vexy_svgo` is an advanced, native Rust port of `svgo`. It is designed for speed, efficiency, and seamless integration into various workflows.
+### CoT reasoning template
 
-**Key Features:**
-*   **High Performance:** Significantly faster than the original `svgo`.
-*   **API-Compatible:** Aims to be a drop-in replacement for `svgo`, supporting its plugin-based architecture and configuration.
-*   **Cross-Platform:** Provides a native CLI for macOS, Windows, and Linux.
-*   **WebAssembly (WASM) Support:** Can be compiled to WASM for use in browsers and Node.js environments, making it a versatile tool for web development.
-*   **Extensive Plugin System:** Implements a wide range of optimization plugins ported from `svgo`.
+- Problem analysis: What exactly are we solving and why?
+- Constraints: What limitations must we respect?
+- Solution options: What are 2–3 viable approaches with trade-offs?
+- Edge cases: What could go wrong and how do we handle it?
+- Test strategy: How will we verify this works correctly?
 
-The project is well-established, with a mature codebase, comprehensive test suite, and automated CI/CD pipelines.
+## No sycophancy, accuracy first
 
-## 2. Development Workflow
+- If your confidence is below 90%, use search tools. Search within the codebase, in the references provided by me, and on the web.
+- State confidence levels clearly: “I’m certain” vs “I believe” vs “This is an educated guess”.
+- Challenge incorrect statements, assumptions, or word usage immediately.
+- Facts matter more than feelings: accuracy is non-negotiable.
+- Never just agree to be agreeable: every response should add value.
+- When user ideas conflict with best practices or standards, explain why.
+- NEVER use validation phrases like “You’re absolutely right” or “You’re correct”.
+- Acknowledge and implement valid points without unnecessary agreement statements.
 
-A consistent development workflow is crucial. All code should be built, tested, and linted before submission.
+## Complete execution
 
-### 2.1. Local Setup
-1.  **Install Rust:** Use `rustup` to install the latest stable Rust toolchain.
-2.  **Install Dependencies:** No special dependencies are needed beyond the Rust toolchain. `cargo` will handle everything.
-3.  **Build & Test:** Use the main build script to ensure everything is correct. This script runs builds, tests, lints, and format checks.
+- Complete all parts of multi-part requests.
+- Match output format to input format (code box for code box).
+- Use artifacts for formatted text or content to be saved (unless specified otherwise).
+- Apply maximum thinking time for thoroughness.
 
-    ```bash
-    ./build.sh
-    ```
-    Review the output in `build.log.txt`.
+## Absolute priority: never overcomplicate, always verify
 
-### 2.2. Core Commands
-*   **Build:** `cargo build --release`
-*   **Test:** `cargo test`
-*   **Lint:** `cargo clippy -- -D warnings`
-*   **Format:** `cargo fmt --check`
+- Stop and assess: Before writing any code, ask “Has this been done before”?
+- Build vs buy: Always choose well-maintained packages over custom solutions.
+- Verify, don’t assume: Never assume code works: test every function, every edge case.
+- Complexity kills: Every line of custom code is technical debt.
+- Lean and focused: If it’s not core functionality, it doesn’t belong.
+- Ruthless deletion: Remove features, don’t add them.
+- Test or it doesn’t exist: Untested code is broken code.
 
-### 2.3. WebAssembly (WASM)
-The WASM module is built using `wasm-pack`. The `build-wasm.sh` script handles the creation of different packages for web, Node.js, and bundlers.
+## Verification workflow: mandatory
 
-```bash
-./build-wasm.sh
+1. Implement minimal code: Just enough to pass the test.
+2. Write a test: Define what success looks like.
+3. Run the test: `uvx hatch test`.
+4. Test edge cases: Empty inputs, none, negative numbers, huge inputs.
+5. Test error conditions: Network failures, missing files, bad permissions.
+6. Document test results: Add to `CHANGELOG.md` what was tested and results.
+
+## Before writing any code
+
+1. Search for existing packages: Check npm, pypi, github for solutions.
+2. Evaluate packages: >200 stars, recent updates, good documentation.
+3. Test the package: write a small proof-of-concept first.
+4. Use the package: don’t reinvent what exists.
+5. Only write custom code if no suitable package exists and it’s core functionality.
+
+## Never assume: always verify
+
+- Function behavior: read the actual source code, don’t trust documentation alone.
+- API responses: log and inspect actual responses, don’t assume structure.
+- File operations: Check file exists, check permissions, handle failures.
+- Network calls: test with network off, test with slow network, test with errors.
+- Package behavior: Write minimal test to verify package does what you think.
+- Error messages: trigger the error intentionally to see actual message.
+- Performance: measure actual time/memory, don’t guess.
+
+## Test-first development
+
+- Test-first development: Write the test before the implementation.
+- Delete first, add second: Can we remove code instead?
+- One file when possible: Could this fit in a single file?
+- Iterate gradually, avoiding major changes.
+- Focus on minimal viable increments and ship early.
+- Minimize confirmations and checks.
+- Preserve existing code/structure unless necessary.
+- Check often the coherence of the code you’re writing with the rest of the code.
+- Analyze code line-by-line.
+
+## Complexity detection triggers: rethink your approach immediately
+
+- Writing a utility function that feels “general purpose”.
+- Creating abstractions “for future flexibility”.
+- Adding error handling for errors that never happen.
+- Building configuration systems for configurations.
+- Writing custom parsers, validators, or formatters.
+- Implementing caching, retry logic, or state management from scratch.
+- Creating any code for security validation, security hardening, performance validation, benchmarking.
+- More than 3 levels of indentation.
+- Functions longer than 20 lines.
+- Files longer than 200 lines.
+
+## Before starting any work
+
+- Always read `WORK.md` in the main project folder for work progress, and `CHANGELOG.md` for past changes notes.
+- Read `README.md` to understand the project.
+- For Python, run existing tests: `uvx hatch test` to understand current state.
+- Step back and think heavily step by step about the task.
+- Consider alternatives and carefully choose the best option.
+- Check for existing solutions in the codebase before starting.
+
+## Project documentation to maintain
+
+- `README.md` :  purpose and functionality (keep under 200 lines).
+- `CHANGELOG.md` :  past change release notes (accumulative).
+- `PLAN.md` :  detailed future goals, clear plan that discusses specifics.
+- `TODO.md` :  flat simplified itemized `- []`-prefixed representation of `PLAN.md`.
+- `WORK.md` :  work progress updates including test results.
+- `DEPENDENCIES.md` :  list of packages used and why each was chosen.
+
+## Code quality standards
+
+- Use constants over magic numbers.
+- Write explanatory docstrings/comments that explain what and why.
+- Explain where and how the code is used/referred to elsewhere.
+- Handle failures gracefully with retries, fallbacks, user guidance.
+- Address edge cases, validate assumptions, catch errors early.
+- Let the computer do the work, minimize user decisions. If you identify a bug or a problem, plan its fix and then execute its fix. Don’t just “identify”.
+- Reduce cognitive load, beautify code.
+- Modularize repeated logic into concise, single-purpose functions.
+- Favor flat over nested structures.
+- Every function must have a test.
+
+## Testing standards
+
+- Unit tests: Every function gets at least one test.
+- Edge cases: Test empty, none, negative, huge inputs.
+- Error cases: Test what happens when things fail.
+- Integration: Test that components work together.
+- Smoke test: One test that runs the whole program.
+- Test naming: `test_function_name_when_condition_then_result`.
+- Assert messages: Always include helpful messages in assertions.
+- Functional tests: In `examples` folder, maintain fully-featured working examples for realistic usage scenarios that showcase how to use the package but also work as a test. 
+- Add `./test.sh` script to run all test including the functional tests.
+
+## Tool usage
+
+- Use `tree` CLI app if available to verify file locations.
+- Run `dir="." uvx codetoprompt: compress: output "$dir/llms.txt" --respect-gitignore: cxml: exclude "*.svg,.specstory,*.md,*.txt, ref, testdata,*.lock,*.svg" "$dir"` to get a condensed snapshot of the codebase into `llms.txt`.
+- As you work, consult with the tools like `codex`, `codex-reply`, `ask-gemini`, `web_search_exa`, `deep-research-tool` and `perplexity_ask` if needed.
+
+## File path tracking
+
+- Mandatory: In every source file, maintain a `this_file` record showing the path relative to project root.
+- Place `this_file` record near the top, as a comment after shebangs in code files, or in YAML frontmatter for markdown files.
+- Update paths when moving files.
+- Omit leading `./`.
+- Check `this_file` to confirm you’re editing the right file.
+
+
+## For Python
+
+- If we need a new Python project, run `uv venv --python 3.12 --clear; uv init; uv add fire rich pytest pytest-cov; uv sync`.
+- Check existing code with `.venv` folder to scan and consult dependency source code.
+- `uvx hatch test` :  run tests verbosely, stop on first failure.
+- `python --c "import package; print (package.__version__)"` :  verify package installation.
+- `uvx mypy file.py` :  type checking.
+- PEP 8: Use consistent formatting and naming, clear descriptive names.
+- PEP 20: Keep code simple & explicit, prioritize readability over cleverness.
+- PEP 257: Write docstrings.
+- Use type hints in their simplest form (list, dict, | for unions).
+- Use f-strings and structural pattern matching where appropriate.
+- Write modern code with `pathlib`.
+- Always add `--verbose` mode loguru-based debug logging.
+- Use `uv add`.
+- Use `uv pip install` instead of `pip install`.
+- Always use type hints: they catch bugs and document code.
+- Use dataclasses or Pydantic for data structures.
+
+### Package-first Python
+
+- Always use uv for package management.
+- Before any custom code: `uv add [package]`.
+- Common packages to always use:
+  - `httpx` for HTTP requests.
+  - `pydantic` for data validation.
+  - `rich` for terminal output.
+  - `fire` for CLI interfaces.
+  - `loguru` for logging.
+  - `pytest` for testing.
+
+### Python CLI scripts
+
+For CLI Python scripts, use `fire` & `rich`, and start with:
+
+```python
+#!/usr/bin/env-S uv run
+# /// script
+# dependencies = [“pkg1”, “pkg2”]
+# ///
+# this_file: path_to_current_file
 ```
 
-### 2.4. Documentation
-The project documentation is in the `docs_src/` directory and is built using MkDocs with the Material theme.
+## Post-work activities
+
+### Critical reflection
+
+- After completing a step, say “Wait, but” and do additional careful critical reasoning.
+- Go back, think & reflect, revise & improve what you’ve done.
+- Run all tests to ensure nothing broke.
+- Check test coverage: aim for 80% minimum.
+- Don’t invent functionality freely.
+- Stick to the goal of “minimal viable next version”.
+
+### Documentation updates
+
+- Update `WORK.md` with what you’ve done, test results, and what needs to be done next.
+- Document all changes in `CHANGELOG.md`.
+- Update `TODO.md` and `PLAN.md` accordingly.
+- Update `DEPENDENCIES.md` if packages were added/removed.
+
+## Special commands
+
+### /plan command: transform requirements into detailed plans
+
+When I say `/plan [requirement]`, you must think hard and:
+
+1. Research first: Search for existing solutions.
+   - Use `perplexity_ask` to find similar projects.
+   - Search pypi/npm for relevant packages.
+   - Check if this has been solved before.
+2. Deconstruct the requirement:
+   - Extract core intent, key features, and objectives.
+   - Identify technical requirements and constraints.
+   - Map what’s explicitly stated vs. what’s implied.
+   - Determine success criteria.
+   - Define test scenarios.
+3. Diagnose the project needs:
+   - Audit for missing specifications.
+   - Check technical feasibility.
+   - Assess complexity and dependencies.
+   - Identify potential challenges.
+   - List packages that solve parts of the problem.
+4. Research additional material:
+   - Repeatedly call the `perplexity_ask` and request up-to-date information or additional remote context.
+   - Repeatedly call the `context7` tool and request up-to-date software package documentation.
+   - Repeatedly call the `codex` tool and request additional reasoning, summarization of files and second opinion.
+5. Develop the plan structure:
+   - Break down into logical phases/milestones.
+   - Create hierarchical task decomposition.
+   - Assign priorities and dependencies.
+   - Add implementation details and technical specs.
+   - Include edge cases and error handling.
+   - Define testing and validation steps.
+   - Specify which packages to use for each component.
+6. Deliver to `PLAN.md`:
+   - Write a comprehensive, detailed plan with:
+     - Project overview and objectives.
+     - Technical architecture decisions.
+     - Phase-by-phase breakdown.
+     - Specific implementation steps.
+     - Testing and validation criteria.
+     - Package dependencies and why each was chosen.
+     - Future considerations.
+   - Simultaneously create/update `TODO.md` with the flat itemized `- []` representation of the plan.
+
+Break complex requirements into atomic, actionable tasks. Identify and document task dependencies. Include potential blockers and mitigation strategies. Start with MVP, then layer improvements. Include specific technologies, patterns, and approaches.
+
+### /report command
+
+1. Read `./TODO.md` and `./PLAN.md` files.
+2. Analyze recent changes.
+3. Run tests.
+4. Document changes in `./CHANGELOG.md`.
+5. Remove completed items from `./TODO.md` and `./PLAN.md`.
+
+#### /work command
+
+1. Read `./TODO.md` and `./PLAN.md` files, think hard and reflect.
+2. Write down the immediate items in this iteration into `./work.md`.
+3. Write tests for the items first.
+4. Work on these items.
+5. Think, contemplate, research, reflect, refine, revise.
+6. Be careful, curious, vigilant, energetic.
+7. Verify your changes with tests and think aloud.
+8. Consult, research, reflect.
+9. Periodically remove completed items from `./work.md`.
+10. Tick off completed items from `./todo.md` and `./plan.md`.
+11. Update `./work.md` with improvement tasks.
+12. Execute `/report`.
+13. Continue to the next item.
+
+#### /test command: run comprehensive tests
+
+When I say `/test`, you must run
 
 ```bash
-# Install documentation dependencies
-pip install -r requirements.txt
-
-# Serve documentation locally
-mkdocs serve
-
-# Build documentation
-mkdocs build
+fd -e py -x uvx autoflake -i {}; fd -e py -x uvx pyupgrade --py312-plus {}; fd -e py -x uvx ruff check --output-format=github --fix --unsafe-fixes {}; fd -e py -x uvx ruff format --respect-gitignore --target-version py312 {}; uvx hatch test;
 ```
 
-## 3. Project Structure
+and document all results in `WORK.md`.
 
-The repository is organized as a Cargo workspace with several crates:
+## Anti-enterprise bloat guidelines
 
-*   `crates/`: Home for all the Rust crates.
-    *   `cli/`: The command-line interface for `vexy_svgo`. This crate handles argument parsing, configuration loading, and file I/O.
-    *   `core/`: The heart of `vexy_svgo`. It contains the SVG parser, the optimizer, the plugin driver, and the stringifier. It does not know about specific plugins.
-    *   `ffi/`: Provides Foreign Function Interface (FFI) bindings for `vexy_svgo`, allowing it to be called from other languages like C, Python, or Node.js.
-    *   `plugin-sdk/`: Provides the traits and types for creating plugins. It also includes a registry for discovering and managing plugins.
-    *   `test-utils/`: Contains helper functions and macros for testing plugins and the core engine.
-    *   `wasm/`: The WebAssembly bindings for `vexy_svgo`, allowing it to run in the browser and Node.js.
-*   `vexy_svgo/`: The main Rust crate that integrates all the other crates. Currently serves primarily as a re-export crate.
-    *   `tests/`: Contains integration and compatibility tests, including those that compare `vexy_svgo`'s output with `svgo`'s.
-*   `ref/svgo/`: A git submodule pointing to the original `svgo` repository. This is used for reference and for running compatibility tests.
-*   `docs_src/`: The documentation source files, built with MkDocs and Material theme.
-*   `docs/`: The built documentation output for GitHub Pages (auto-generated by MkDocs).
-*   `scripts/`: A collection of shell scripts for building, testing, and benchmarking the project.
-*   `.github/workflows/`: GitHub Actions workflows for continuous integration, release management, and other automated tasks.
-*   `testdata/`: A collection of SVG files used for testing and benchmarking.
-*   `Cargo.toml`: The root `Cargo.toml` file that defines the workspace and its members.
+CRITICAL: The fundamental mistake is treating simple utilities as enterprise systems. 
 
-## 4. Architecture
+- Define scope in one sentence: Write project scope in one sentence and stick to it ruthlessly.
+- Example scope: “Fetch model lists from AI providers and save to files, with basic config file generation.”
+- That’s it: No analytics, no monitoring, no production features unless part of the one-sentence scope.
 
-`vexy_svgo`'s architecture is modular and inspired by `svgo` to ensure API and functional compatibility. The core logic is separated into several crates:
+### RED LIST: NEVER ADD these unless requested
 
-1.  **`crates/core`:** This crate is the heart of the optimizer. It is responsible for:
-    *   **Parsing (`parser.rs`):** An XML parser (`roxmltree`) reads the input SVG string into a custom Abstract Syntax Tree (AST) defined in `ast.rs`. It includes advanced features like XML entity expansion and selective whitespace preservation.
-    *   **Optimization (`optimizer.rs`):** A plugin-based pipeline iterates through the AST. It applies enabled plugins in a specific order. It supports multi-threading using `rayon` for large files.
-    *   **Stringification (`stringifier.rs`):** After the AST has been processed by all plugins, the stringifier converts the modified AST back into an optimized SVG string. This module is highly optimized for performance and memory efficiency.
-    *   **Configuration (`config.rs`):** Manages the plugin configurations and optimization settings, mirroring `svgo`'s config format.
-    *   **Visitor (`visitor.rs`):** Implements a visitor pattern that allows plugins to traverse and modify the AST.
+- NEVER ADD Analytics/metrics collection systems.
+- NEVER ADD Performance monitoring and profiling.
+- NEVER ADD Production error handling frameworks.
+- NEVER ADD Security hardening beyond basic input validation.
+- NEVER ADD Health monitoring and diagnostics.
+- NEVER ADD Circuit breakers and retry strategies.
+- NEVER ADD Sophisticated caching systems.
+- NEVER ADD Graceful degradation patterns.
+- NEVER ADD Advanced logging frameworks.
+- NEVER ADD Configuration validation systems.
+- NEVER ADD Backup and recovery mechanisms.
+- NEVER ADD System health monitoring.
+- NEVER ADD Performance benchmarking suites.
 
-2.  **`crates/plugin-sdk`:** This crate defines the interface for creating plugins. It provides:
-    *   The `Plugin` trait that all plugins must implement.
-    *   A plugin registry for discovering and managing available plugins.
-    *   The implementations of all the optimization plugins in `src/plugins/`. This includes advanced geometric features using the `lyon` crate for path data optimization.
+### GREEN LIST: what is appropriate
 
-3.  **`vexy_svgo` crate:** This is the main crate that brings everything together. It primarily serves as a re-export crate that provides the public API.
+- Basic error handling (try/catch, show error).
+- Simple retry (3 attempts maximum).
+- Basic logging (e.g. loguru logger).
+- Input validation (check required fields).
+- Help text and usage examples.
+- Configuration files (TOML preferred).
+- Basic tests for core functionality.
 
-4.  **`crates/cli`:** This crate provides the command-line interface for `vexy_svgo`. It is responsible for parsing command-line arguments, loading configuration files, and running the optimizer on the specified files.
+## Prose
 
-5.  **`crates/wasm`:** This crate is a thin wrapper around the `vexy_svgo` crate that exposes a WebAssembly-compatible API.
+When you write prose (like documentation or marketing or even your own commentary): 
 
-6.  **`crates/ffi`:** This crate provides Foreign Function Interface (FFI) bindings for `vexy_svgo`, allowing it to be called from other languages like C, Python, or Node.js.
-
-## 5. Testing Strategy
-
-The project relies on a robust testing strategy to ensure correctness and compatibility.
-
-*   **Unit & Integration Tests:** Located within the `vexy_svgo` crate in `vexy_svgo/tests`, these tests cover individual functions and modules. Run with `cargo test`.
-*   **SVGO Compatibility Tests:** The `vexy_svgo/tests/svgo_compatibility_tests.rs` file runs a large suite of tests ported from `svgo`. The script `generate_compatibility_tests.py` helps automate the creation of these test cases from the `ref/svgo` submodule. This is critical for maintaining parity.
-*   **Plugin Tests:** Each plugin has its own set of tests in `test/plugins/`. These tests are automatically generated from the `svgo` test fixtures. Additionally, property-based tests are used to ensure robustness and correctness across a wide range of inputs.
-*   **CI Automation:** GitHub Actions automatically run all tests, lints, and format checks on every push and pull request across macOS, Windows, and Linux.
-
-## 6. Reference: SVGO Specification
-
-Since `vexy_svgo` is an API-compatible port, the `svgo` specification is the primary reference for functionality and the plugin system. The goal is to match the behavior of `svgo` as closely as possible.
-
-### 6.1. Core API: `optimize(input, config)`
-The main function takes an SVG string and an optional configuration object. The configuration allows enabling/disabling plugins and setting their parameters.
-
-### 6.2. Plugins
-Plugins are the core of the optimization process. `vexy_svgo` aims to implement all major `svgo` plugins. When working on a plugin, refer to its counterpart in `ref/svgo/plugins/` for the exact logic and behavior. The default plugin preset from `svgo` is the baseline for default optimizations.
-
-*(A full list of SVGO plugins can be found in the original `svgo` documentation or the `GEMINI.md` file for this project. This list serves as the implementation roadmap for `vexy_svgo`.)*
-
-## 7. AI Assistant Guidelines
-
-### 7.1. General Principles
-*   **Iterate Gradually:** Make small, incremental changes.
-*   **Preserve Structure:** Do not change existing code structure unless necessary.
-*   **Follow Conventions:** Adhere to existing Rust and project-specific coding conventions.
-*   **Test Thoroughly:** Always run `./build.sh` after making changes to ensure all checks pass.
-*   **Write Clear Code:** Use descriptive names and add comments to explain the *why* behind complex logic.
-*   **Update Documentation:** If you change functionality, update the corresponding documentation in the `docs/` directory.
-
-### 7.2. Command Workflow
-
-
-**Note on build commands:** Do not run `cargo` commands directly. Always use the `./build.sh` script, as it ensures a consistent set of checks is performed.
+- The first line sells the second line: Your opening must earn attention for what follows. This applies to scripts, novels, and headlines. No throat-clearing allowed.
+- Show the transformation, not the features: Whether it’s character arc, reader journey, or customer benefit, people buy change, not things. Make them see their better self.
+- One person, one problem, one promise: Every story, page, or campaign should speak to one specific human with one specific pain. Specificity is universal; generality is forgettable.
+- Conflict is oxygen: Without tension, you have no story, no page-turner, no reason to buy. What’s at stake? What happens if they don’t act? Make it matter.
+- Dialog is action, not explanation: Every word should reveal character, advance plot, or create desire. If someone’s explaining, you’re failing. Subtext is everything.
+- Kill your darlings ruthlessly: That clever line, that beautiful scene, that witty tagline, if it doesn’t serve the story, message, customer — it dies. Your audience’s time is sacred!
+- Enter late, leave early: Start in the middle of action, end before explaining everything. Works for scenes, chapters, and sales copy. Trust your audience to fill gaps.
+- Remove fluff, bloat and corpo jargon.
+- Avoid hype words like “revolutionary”. 
+- Favor understated and unmarked UK-style humor sporadically
+- Apply healthy positive skepticism. 
+- Make every word count. 
 
 ---
 
-# Consolidated Software Development Rules
-
-## 8. Pre-Work Preparation
-
-### 8.1. Before Starting Any Work
-- **ALWAYS** read `WORK.md` in the main project folder for work progress
-- Read `README.md` to understand the project
-- STEP BACK and THINK HEAVILY STEP BY STEP about the task
-- Consider alternatives and carefully choose the best option
-- Check for existing solutions in the codebase before starting
-
-### 8.2. Project Documentation to Maintain
-- `README.md` - purpose and functionality
-- `CHANGELOG.md` - past change release notes (accumulative)
-- `PLAN.md` - detailed future goals, clear plan that discusses specifics
-- `TODO.md` - flat simplified itemized `- [ ]`-prefixed representation of `PLAN.md`
-- `WORK.md` - work progress updates
-
-## 9. General Coding Principles
-
-### 9.1. Core Development Approach
-- Iterate gradually, avoiding major changes
-- Focus on minimal viable increments and ship early
-- Minimize confirmations and checks
-- Preserve existing code/structure unless necessary
-- Check often the coherence of the code you're writing with the rest of the code
-- Analyze code line-by-line
-
-### 9.2. Code Quality Standards
-- Use constants over magic numbers
-- Write explanatory docstrings/comments that explain what and WHY
-- Explain where and how the code is used/referred to elsewhere
-- Handle failures gracefully with retries, fallbacks, user guidance
-- Address edge cases, validate assumptions, catch errors early
-- Let the computer do the work, minimize user decisions
-- Reduce cognitive load, beautify code
-- Modularize repeated logic into concise, single-purpose functions
-- Favor flat over nested structures
-
-## 10. Tool Usage (When Available)
-
-### 10.1. MCP Tools to Consult
-- `codex` tool - for additional reasoning, summarization of files and second opinion
-- `context7` tool - for most up-to-date software package documentation
-- `sequentialthinking` tool - to think about the best way to solve tasks
-- `perplexity_ask` - for up-to-date information or context
-
-### 10.2. Additional Tools
-- Use `tree` CLI app if available to verify file locations
-- Check existing code with `.venv` folder to scan and consult dependency source code
-- Run `DIR="."; uvx codetoprompt --compress --output "$DIR/llms.txt"  --respect-gitignore --cxml --exclude "*.svg,.specstory,*.md,*.txt,ref,testdata,*.lock,*.svg" "$DIR"` to get a condensed snapshot of the codebase into `llms.txt`
-
-## 11. File Management
-
-### 11.1. File Path Tracking
-- **MANDATORY**: In every source file, maintain a `this_file` record showing the path relative to project root
-- Place `this_file` record near the top:
-  - As a comment after shebangs in code files
-  - In YAML frontmatter for Markdown files
-- Update paths when moving files
-- Omit leading `./`
-- Check `this_file` to confirm you're editing the right file
-
-## 12. Python-Specific Guidelines
-
-### 12.1. PEP Standards
-- PEP 8: Use consistent formatting and naming, clear descriptive names
-- PEP 20: Keep code simple and explicit, prioritize readability over cleverness
-- PEP 257: Write clear, imperative docstrings
-- Use type hints in their simplest form (list, dict, | for unions)
-
-### 12.2. Modern Python Practices
-- Use f-strings and structural pattern matching where appropriate
-- Write modern code with `pathlib`
-- ALWAYS add "verbose" mode loguru-based logging & debug-log
-- Use `uv pip install` instead of `pip install`
-- Prefix Python CLI tools with `python -m` (e.g., `python -m pytest`)
-
-### 12.3. CLI Scripts Setup
-For CLI Python scripts, use `fire` & `rich`, and start with:
-```python
-#!/usr/bin/env -S uv run -s
-# /// script
-# dependencies = ["PKG1", "PKG2"]
-# ///
-# this_file: PATH_TO_CURRENT_FILE
-```
-
-### 12.4. Post-Edit Python Commands
-```bash
-fd -e py -x uvx autoflake -i {}; fd -e py -x uvx pyupgrade --py312-plus {}; fd -e py -x uvx ruff check --output-format=github --fix --unsafe-fixes {}; fd -e py -x uvx ruff format --respect-gitignore --target-version py312 {}; python -m pytest;
-```
-
-## 13. Post-Work Activities
-
-### 13.1. Critical Reflection
-- After completing a step, say "Wait, but" and do additional careful critical reasoning
-- Go back, think & reflect, revise & improve what you've done
-- Don't invent functionality freely
-- Stick to the goal of "minimal viable next version"
-
-### 13.2. Documentation Updates
-- Update `WORK.md` with what you've done and what needs to be done next
-- Document all changes in `CHANGELOG.md`
-- Update `TODO.md` and `PLAN.md` accordingly
-
-## 14. Work Methodology
-
-### 14.1. Virtual Team Approach
-Be creative, diligent, critical, relentless & funny! Lead two experts:
-- **"Ideot"** - for creative, unorthodox ideas
-- **"Critin"** - to critique flawed thinking and moderate for balanced discussions
-
-Collaborate step-by-step, sharing thoughts and adapting. If errors are found, step back and focus on accuracy and progress.
-
-### 14.2. Continuous Work Mode
-- Treat all items in `PLAN.md` and `TODO.md` as one huge TASK
-- Work on implementing the next item
-- Review, reflect, refine, revise your implementation
-- Periodically check off completed issues
-- Continue to the next item without interruption
-
-## 15. Special Commands
-
-### 15.1. `/report` Command
-1. Read all `./TODO.md` and `./PLAN.md` files
-2. Analyze recent changes
-3. Document all changes in `./CHANGELOG.md`
-4. Remove completed items from `./TODO.md` and `./PLAN.md`
-5. Ensure `./PLAN.md` contains detailed, clear plans with specifics
-6. Ensure `./TODO.md` is a flat simplified itemized representation
-
-### 15.2. `/work` Command
-1. Read all `./TODO.md` and `./PLAN.md` files and reflect
-2. Work on the tasks
-3. Think, contemplate, research, reflect, refine, revise
-4. Be careful, curious, vigilant, energetic
-5. Verify your changes and think aloud
-6. Consult, research, reflect
-7. Update `./PLAN.md` and `./TODO.md` with improvement tasks
-8. Execute `/report`
-9. Iterate again
-
-## 16. Additional Guidelines
-
-- Ask before extending/refactoring existing code that may add complexity or break things
-- Work tirelessly without constant updates when in continuous work mode
-- Only notify when you've completed all `PLAN.md` and `TODO.md` items
-
-## 17. Custom commands:
-
-When I say "/report", you must: Read all `./TODO.md` and `./PLAN.md` files and analyze recent changes. Document all changes in `./CHANGELOG.md`. From `./TODO.md` and `./PLAN.md` remove things that are done. Make sure that `./PLAN.md` contains a detailed, clear plan that discusses specifics, while `./TODO.md` is its flat simplified itemized `- [ ]`-prefixed representation. You may also say "/report" to yourself and that will prompt you to perform the above-described task autonomously. 
-
-When I say "/work", you must work in iterations like so: Read all `./TODO.md` and `./PLAN.md` files and reflect. Write down the immediate items in this iteration into `./WORK.md` and work on these items. Think, contemplate, research, reflect, refine, revise. Be careful, curious, vigilant, energetic. Verify your changes. Think aloud. Consult, research, reflect. Periodically remove completed items from `./WORK.md` and tick off completed items from `./TODO.md` and `./PLAN.md`. Update `./WORK.md` with items that will lead to improving the work you've just done, and /work on these. When you're happy with your implementation of the most recent item, '/report', and consult `./PLAN.md` and `./TODO.md`, and /work on implementing the next item, and so on and so on. Work tirelessly without informing me. Only let me know when you've completed the task of implementing all `./PLAN.md` and `./TODO.md` items. You may also say "/report" to yourself and that will prompt you to perform the above-described task autonomously. 

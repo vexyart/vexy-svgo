@@ -290,12 +290,8 @@ mod unit_tests {
         // Create SVG with title that has attributes
         let mut svg = create_element("svg");
         let mut title = create_element("title");
-        title
-            .attributes
-            .insert("id".to_string(), "myTitle".to_string());
-        title
-            .attributes
-            .insert("class".to_string(), "title-class".to_string());
+        title.set_attr("id", "myTitle");
+        title.set_attr("class", "title-class");
         title.children.push(create_text("Title with attributes"));
         svg.children.push(Node::Element(title));
 

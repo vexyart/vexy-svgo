@@ -390,11 +390,9 @@ mod tests {
             attributes: IndexMap::new(),
             children: vec![],
         };
-        svg.attributes
-            .insert("xml:lang".to_string(), "en".to_string());
-        svg.attributes.insert("lang".to_string(), "en".to_string());
-        svg.attributes
-            .insert("xml:space".to_string(), "preserve".to_string());
+        svg.set_attr("xml:lang", "en");
+        svg.set_attr("lang", "en");
+        svg.set_attr("xml:space", "preserve");
 
         let mut rect = Element {
             name: "rect".into(),
@@ -402,16 +400,12 @@ mod tests {
             attributes: IndexMap::new(),
             children: vec![],
         };
-        rect.attributes.insert("x".to_string(), "0".to_string());
-        rect.attributes.insert("y".to_string(), "0".to_string());
-        rect.attributes
-            .insert("width".to_string(), "100".to_string());
-        rect.attributes
-            .insert("height".to_string(), "100".to_string());
-        rect.attributes
-            .insert("enable-background".to_string(), "new".to_string());
-        rect.attributes
-            .insert("clip".to_string(), "rect(0 0 100 100)".to_string());
+        rect.set_attr("x", "0");
+        rect.set_attr("y", "0");
+        rect.set_attr("width", "100");
+        rect.set_attr("height", "100");
+        rect.set_attr("enable-background", "new");
+        rect.set_attr("clip", "rect(0 0 100 100)");
 
         svg.children.push(Node::Element(rect));
         doc.root = svg;
@@ -455,13 +449,10 @@ mod tests {
         plugin.apply(&mut doc).unwrap();
 
         // xml:lang should be removed because lang exists
-        assert_eq!(doc.root.attributes.get("xml:lang"), None);
-        assert_eq!(doc.root.attributes.get("lang"), Some(&"en".to_string()));
+        assert_eq!(doc.root.attr("xml:lang"), None);
+        assert_eq!(doc.root.attr("lang"), Some("en"));
         // xml:space should still exist (unsafe attribute)
-        assert_eq!(
-            doc.root.attributes.get("xml:space"),
-            Some(&"preserve".to_string())
-        );
+        assert_eq!(doc.root.attr("xml:space"), Some("preserve"));
     }
 
     #[test]
@@ -475,14 +466,14 @@ mod tests {
         plugin.apply(&mut doc).unwrap();
 
         // xml:space should be removed with removeUnsafe
-        assert_eq!(doc.root.attributes.get("xml:space"), None);
+        assert_eq!(doc.root.attr("xml:space"), None);
 
         // Check rect element - unsafe presentation attributes should be removed
         if let Some(Node::Element(ref rect)) = doc.root.children.first() {
-            assert_eq!(rect.attributes.get("enable-background"), None);
-            assert_eq!(rect.attributes.get("clip"), None);
+            assert_eq!(rect.attr("enable-background"), None);
+            assert_eq!(rect.attr("clip"), None);
             // Regular attributes should remain
-            assert_eq!(rect.attributes.get("width"), Some(&"100".to_string()));
+            assert_eq!(rect.attr("width"), Some("100"));
         }
     }
 
@@ -496,8 +487,7 @@ mod tests {
             attributes: IndexMap::new(),
             children: vec![],
         };
-        svg.attributes
-            .insert("xml:lang".to_string(), "en".to_string());
+        svg.set_attr("xml:lang", "en");
         // No lang attribute
 
         doc.root = svg;
@@ -507,7 +497,7 @@ mod tests {
         plugin.apply(&mut doc).unwrap();
 
         // xml:lang should be kept because lang doesn't exist
-        assert_eq!(doc.root.attributes.get("xml:lang"), Some(&"en".to_string()));
+        assert_eq!(doc.root.attr("xml:lang"), Some("en"));
     }
 
     #[test]
@@ -527,12 +517,8 @@ mod tests {
             attributes: IndexMap::new(),
             children: vec![],
         };
-        animate
-            .attributes
-            .insert("attributeType".to_string(), "XML".to_string());
-        animate
-            .attributes
-            .insert("attributeName".to_string(), "x".to_string());
+        animate.set_attr("attributeType", "XML");
+        animate.set_attr("attributeName", "x");
 
         svg.children.push(Node::Element(animate));
         doc.root = svg;
@@ -546,11 +532,8 @@ mod tests {
 
         // attributeType is an unsafe deprecated attribute
         if let Some(Node::Element(ref animate)) = doc.root.children.first() {
-            assert_eq!(animate.attributes.get("attributeType"), None);
-            assert_eq!(
-                animate.attributes.get("attributeName"),
-                Some(&"x".to_string())
-            );
+            assert_eq!(animate.attr("attributeType"), None);
+            assert_eq!(animate.attr("attributeName"), Some("x"));
         }
     }
 }

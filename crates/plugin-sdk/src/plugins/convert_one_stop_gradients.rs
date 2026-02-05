@@ -12,6 +12,7 @@ use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::collections::COLORS_PROPS;
@@ -397,17 +398,16 @@ mod tests {
         let mut doc = create_test_document();
 
         // Add a simple rect element
-        let mut rect_attrs = IndexMap::new();
-        rect_attrs.insert("fill".to_string(), "red".to_string());
-        rect_attrs.insert("width".to_string(), "100".to_string());
-        rect_attrs.insert("height".to_string(), "100".to_string());
-
-        doc.root.children.push(Node::Element(Element {
+        let mut rect = Element {
             name: "rect".into(),
-            attributes: rect_attrs,
+            attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
             children: vec![],
-        }));
+        };
+        rect.set_attr("fill", "red");
+        rect.set_attr("width", "100");
+        rect.set_attr("height", "100");
+        doc.root.children.push(Node::Element(rect));
 
         let result = plugin.apply(&mut doc);
         assert!(result.is_ok());
@@ -416,7 +416,7 @@ mod tests {
         assert_eq!(doc.root.children.len(), 1);
         if let Node::Element(rect) = &doc.root.children[0] {
             assert_eq!(rect.name, "rect");
-            assert_eq!(rect.attr("fill").map(|s| s.as_str()), Some("red"));
+            assert_eq!(rect.attr("fill"), Some("red"));
         }
     }
 
@@ -434,10 +434,10 @@ mod tests {
         };
 
         let mut gradient_attrs = IndexMap::new();
-        gradient_attrs.insert("id".to_string(), "grad1".to_string());
+        gradient_attrs.insert(Cow::Borrowed("id"), Cow::Borrowed("grad1"));
 
         let mut stop_attrs = IndexMap::new();
-        stop_attrs.insert("stop-color".to_string(), "#ff0000".to_string());
+        stop_attrs.insert(Cow::Borrowed("stop-color"), Cow::Borrowed("#ff0000"));
 
         let gradient_elem = Element {
             name: "linearGradient".into(),
@@ -456,9 +456,9 @@ mod tests {
 
         // Add rect using the gradient
         let mut rect_attrs = IndexMap::new();
-        rect_attrs.insert("fill".to_string(), "url(#grad1)".to_string());
-        rect_attrs.insert("width".to_string(), "100".to_string());
-        rect_attrs.insert("height".to_string(), "100".to_string());
+        rect_attrs.insert(Cow::Borrowed("fill"), Cow::Borrowed("url(#grad1)"));
+        rect_attrs.insert(Cow::Borrowed("width"), Cow::Borrowed("100"));
+        rect_attrs.insert(Cow::Borrowed("height"), Cow::Borrowed("100"));
 
         doc.root.children.push(Node::Element(Element {
             name: "rect".into(),
@@ -502,6 +502,6 @@ mod tests {
 
         assert!(rect.is_some());
         let rect = rect.unwrap();
-        assert_eq!(rect.attr("fill").map(|s| s.as_str()), Some("#ff0000"));
+        assert_eq!(rect.attr("fill"), Some("#ff0000"));
     }
 }

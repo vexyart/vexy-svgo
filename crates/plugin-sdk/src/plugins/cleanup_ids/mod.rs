@@ -14,7 +14,7 @@
 
 use crate::Plugin;
 use anyhow::{anyhow, Result};
-// this_file: crates/plugin-sdk/src/plugins/cleanup_ids/mod.rs
+use vexy_svgo_core::error::VexyError;
 
 pub mod collector;
 pub mod renamer;
@@ -298,7 +298,7 @@ impl CleanupIdsVisitor {
 }
 
 impl Visitor<'_> for CleanupIdsVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Update path
         let _child_index = self.current_path.len();
         self.current_path.push(0);
@@ -328,7 +328,7 @@ impl Visitor<'_> for CleanupIdsVisitor {
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<(), VexyError> {
         // Update path
         self.current_path.pop();
         if !self.current_path.is_empty() {
@@ -361,7 +361,7 @@ impl<'a> IdApplierVisitor<'a> {
 }
 
 impl Visitor<'_> for IdApplierVisitor<'_> {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Update path
         let _child_index = self.current_path.len();
         self.current_path.push(0);
@@ -404,7 +404,7 @@ impl Visitor<'_> for IdApplierVisitor<'_> {
         Ok(())
     }
 
-    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, _element: &mut Element<'_>) -> Result<(), VexyError> {
         // Update path
         self.current_path.pop();
         if !self.current_path.is_empty() {
@@ -509,19 +509,13 @@ mod unit_tests {
 
         // Add elements with IDs
         let mut rect1 = create_element("rect");
-        rect1
-            .attributes
-            .insert("id".to_string(), "used".to_string());
+        rect1.set_attr("id", "used");
 
         let mut rect2 = create_element("rect");
-        rect2
-            .attributes
-            .insert("id".to_string(), "unused".to_string());
+        rect2.set_attr("id", "unused");
 
         let mut use_elem = create_element("use");
-        use_elem
-            .attributes
-            .insert("href".to_string(), "#used".to_string());
+        use_elem.set_attr("href", "#used");
 
         doc.root.children.push(Node::Element(rect1));
         doc.root.children.push(Node::Element(rect2));
@@ -550,13 +544,10 @@ mod unit_tests {
 
         // Add element with long ID
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("id".to_string(), "very_long_identifier".to_string());
+        rect.set_attr("id", "very_long_identifier");
 
         let mut use_elem = create_element("use");
-        use_elem
-            .attributes
-            .insert("href".to_string(), "#very_long_identifier".to_string());
+        use_elem.set_attr("href", "#very_long_identifier");
 
         doc.root.children.push(Node::Element(rect));
         doc.root.children.push(Node::Element(use_elem));
@@ -565,14 +556,14 @@ mod unit_tests {
 
         // Check that ID was minified
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
-            let id = rect.attributes.get("id").unwrap();
+            let id = rect.attr("id").unwrap();
             assert!(id.len() < "very_long_identifier".len());
             assert_eq!(id, "a"); // First generated ID should be "a"
         }
 
         // Check that reference was updated
         if let Some(Node::Element(use_elem)) = doc.root.children.get(1) {
-            assert_eq!(use_elem.attributes.get("href"), Some(&"#a".to_string()));
+            assert_eq!(use_elem.attr("href"), Some("#a"));
         }
     }
 
@@ -590,19 +581,13 @@ mod unit_tests {
 
         // Add elements with IDs to preserve
         let mut rect1 = create_element("rect");
-        rect1
-            .attributes
-            .insert("id".to_string(), "keep_this".to_string());
+        rect1.set_attr("id", "keep_this");
 
         let mut rect2 = create_element("rect");
-        rect2
-            .attributes
-            .insert("id".to_string(), "pres_something".to_string());
+        rect2.set_attr("id", "pres_something");
 
         let mut rect3 = create_element("rect");
-        rect3
-            .attributes
-            .insert("id".to_string(), "remove_this".to_string());
+        rect3.set_attr("id", "remove_this");
 
         doc.root.children.push(Node::Element(rect1));
         doc.root.children.push(Node::Element(rect2));
@@ -612,13 +597,10 @@ mod unit_tests {
 
         // Check preserved IDs
         if let Some(Node::Element(rect1)) = doc.root.children.get(0) {
-            assert_eq!(rect1.attributes.get("id"), Some(&"keep_this".to_string()));
+            assert_eq!(rect1.attr("id"), Some("keep_this"));
         }
         if let Some(Node::Element(rect2)) = doc.root.children.get(1) {
-            assert_eq!(
-                rect2.attributes.get("id"),
-                Some(&"pres_something".to_string())
-            );
+            assert_eq!(rect2.attr("id"), Some("pres_something"));
         }
         if let Some(Node::Element(rect3)) = doc.root.children.get(2) {
             assert!(!rect3.attributes.contains_key("id"));
@@ -638,8 +620,7 @@ mod unit_tests {
 
         // Add element with ID
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("id".to_string(), "should_not_be_removed".to_string());
+        rect.set_attr("id", "should_not_be_removed");
 
         doc.root.children.push(Node::Element(script));
         doc.root.children.push(Node::Element(rect));
@@ -648,10 +629,7 @@ mod unit_tests {
 
         // ID should still be there because of script
         if let Some(Node::Element(rect)) = doc.root.children.get(1) {
-            assert_eq!(
-                rect.attributes.get("id"),
-                Some(&"should_not_be_removed".to_string())
-            );
+            assert_eq!(rect.attr("id"), Some("should_not_be_removed"));
         }
     }
 
@@ -673,8 +651,7 @@ mod unit_tests {
 
         // Add element with unused ID
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("id".to_string(), "should_be_removed".to_string());
+        rect.set_attr("id", "should_be_removed");
 
         doc.root.children.push(Node::Element(script));
         doc.root.children.push(Node::Element(rect));

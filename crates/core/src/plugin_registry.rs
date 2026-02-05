@@ -86,7 +86,6 @@ impl PluginRegistry {
         document: &mut Document<'a>,
         config: &PluginConfig,
     ) -> Result<()> {
-        // Check if plugin is enabled
         let (name, params, enabled) = match config {
             PluginConfig::Name(name) => (name.as_str(), &serde_json::Value::Null, true),
             PluginConfig::WithParams { name, params } => {

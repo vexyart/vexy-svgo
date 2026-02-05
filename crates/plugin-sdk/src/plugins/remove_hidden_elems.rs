@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Configuration parameters for remove hidden elems plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,7 +333,7 @@ impl HiddenElemsRemovalVisitor {
 }
 
 impl Visitor<'_> for HiddenElemsRemovalVisitor {
-    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Remove hidden child elements (process children first)
         element.children.retain(|child| {
             if let Node::Element(child_element) = child {
@@ -418,7 +419,7 @@ mod unit_tests {
         // Only the visible rect should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("display"), Some(&"block".to_string()));
+            assert_eq!(elem.attr("display"), Some("block"));
         }
     }
 
@@ -429,19 +430,13 @@ mod unit_tests {
 
         // Add elements with visibility attributes
         let mut rect1 = create_element("rect");
-        rect1
-            .attributes
-            .insert("visibility".into(), "hidden".into());
+        rect1.set_attr("visibility", "hidden");
 
         let mut rect2 = create_element("rect");
-        rect2
-            .attributes
-            .insert("visibility".into(), "collapse".into());
+        rect2.set_attr("visibility", "collapse");
 
         let mut rect3 = create_element("rect");
-        rect3
-            .attributes
-            .insert("visibility".into(), "visible".into());
+        rect3.set_attr("visibility", "visible");
 
         doc.root.children.push(Node::Element(rect1));
         doc.root.children.push(Node::Element(rect2));
@@ -452,10 +447,7 @@ mod unit_tests {
         // Only the visible rect should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(
-                elem.attributes.get("visibility"),
-                Some(&"visible".to_string())
-            );
+            assert_eq!(elem.attr("visibility"), Some("visible"));
         }
     }
 
@@ -466,19 +458,13 @@ mod unit_tests {
 
         // Add elements with opacity
         let mut rect1 = create_element("rect");
-        rect1
-            .attributes
-            .insert("opacity".into(), "0".into());
+        rect1.set_attr("opacity", "0");
 
         let mut rect2 = create_element("rect");
-        rect2
-            .attributes
-            .insert("opacity".into(), "0.0".into());
+        rect2.set_attr("opacity", "0.0");
 
         let mut rect3 = create_element("rect");
-        rect3
-            .attributes
-            .insert("opacity".into(), "0.5".into());
+        rect3.set_attr("opacity", "0.5");
 
         doc.root.children.push(Node::Element(rect1));
         doc.root.children.push(Node::Element(rect2));
@@ -489,7 +475,7 @@ mod unit_tests {
         // Only the non-zero opacity rect should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("opacity"), Some(&"0.5".to_string()));
+            assert_eq!(elem.attr("opacity"), Some("0.5"));
         }
     }
 
@@ -500,10 +486,10 @@ mod unit_tests {
 
         // Add circles with different radii
         let mut circle1 = create_element("circle");
-        circle1.attributes.insert("r".into(), "0".into());
+        circle1.set_attr("r", "0");
 
         let mut circle2 = create_element("circle");
-        circle2.attributes.insert("r".into(), "10".into());
+        circle2.set_attr("r", "10");
 
         doc.root.children.push(Node::Element(circle1));
         doc.root.children.push(Node::Element(circle2));
@@ -513,7 +499,7 @@ mod unit_tests {
         // Only non-zero radius circle should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("r"), Some(&"10".to_string()));
+            assert_eq!(elem.attr("r"), Some("10"));
         }
     }
 
@@ -524,28 +510,16 @@ mod unit_tests {
 
         // Add rects with zero dimensions
         let mut rect1 = create_element("rect");
-        rect1
-            .attributes
-            .insert("width".into(), "0".into());
-        rect1
-            .attributes
-            .insert("height".into(), "100".into());
+        rect1.set_attr("width", "0");
+        rect1.set_attr("height", "100");
 
         let mut rect2 = create_element("rect");
-        rect2
-            .attributes
-            .insert("width".into(), "100".into());
-        rect2
-            .attributes
-            .insert("height".into(), "0".into());
+        rect2.set_attr("width", "100");
+        rect2.set_attr("height", "0");
 
         let mut rect3 = create_element("rect");
-        rect3
-            .attributes
-            .insert("width".into(), "100".into());
-        rect3
-            .attributes
-            .insert("height".into(), "100".into());
+        rect3.set_attr("width", "100");
+        rect3.set_attr("height", "100");
 
         doc.root.children.push(Node::Element(rect1));
         doc.root.children.push(Node::Element(rect2));
@@ -556,8 +530,8 @@ mod unit_tests {
         // Only non-zero dimension rect should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("width"), Some(&"100".to_string()));
-            assert_eq!(elem.attributes.get("height"), Some(&"100".to_string()));
+            assert_eq!(elem.attr("width"), Some("100"));
+            assert_eq!(elem.attr("height"), Some("100"));
         }
     }
 
@@ -568,15 +542,13 @@ mod unit_tests {
 
         // Add paths with different d attributes
         let mut path1 = create_element("path");
-        path1.attributes.insert("d".into(), "".into());
+        path1.set_attr("d", "");
 
         let mut path2 = create_element("path");
-        path2.attributes.insert("d".into(), "   ".into());
+        path2.set_attr("d", "   ");
 
         let mut path3 = create_element("path");
-        path3
-            .attributes
-            .insert("d".into(), "M10 10 L20 20".into());
+        path3.set_attr("d", "M10 10 L20 20");
 
         let path4 = create_element("path"); // No d attribute
 
@@ -590,7 +562,7 @@ mod unit_tests {
         // Only path with valid d should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("d"), Some(&"M10 10 L20 20".to_string()));
+            assert_eq!(elem.attr("d"), Some("M10 10 L20 20"));
         }
     }
 
@@ -636,7 +608,7 @@ mod unit_tests {
         // Only line with different coordinates should remain
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("x2"), Some(&"20".to_string()));
+            assert_eq!(elem.attr("x2"), Some("20"));
         }
     }
 
@@ -669,7 +641,7 @@ mod unit_tests {
         // display="none" should be kept, opacity="0" should be removed
         assert_eq!(doc.root.children.len(), 1);
         if let Some(Node::Element(elem)) = doc.root.children.get(0) {
-            assert_eq!(elem.attributes.get("display"), Some(&"none".to_string()));
+            assert_eq!(elem.attr("display"), Some("none"));
         }
     }
 }

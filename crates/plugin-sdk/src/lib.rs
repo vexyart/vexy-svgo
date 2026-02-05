@@ -138,7 +138,7 @@ impl PluginRegistry {
             }
 
             let plugin = self.get(&config.name).ok_or_else(|| {
-                PluginError::InvalidConfig(format!("Unknown plugin: {}", config.name))
+                VexyError::Config(format!("Unknown plugin: {}", config.name))
             })?;
 
             // Validate parameters if provided

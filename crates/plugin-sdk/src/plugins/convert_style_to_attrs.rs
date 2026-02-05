@@ -17,6 +17,7 @@ use serde_json::Value;
 use std::sync::LazyLock;
 use vexy_svgo_core::ast::{Document, Element};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Configuration parameters for convert style to attrs plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,7 +284,7 @@ impl ConvertStyleToAttrsVisitor {
 }
 
 impl Visitor<'_> for ConvertStyleToAttrsVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         self.convert_element_styles(element);
         Ok(())
     }
@@ -359,12 +360,8 @@ mod unit_tests {
 
         // Add element with style
         let mut rect = create_element("rect");
-        rect.attributes.insert(
-            "style".to_string(),
-            "fill: red; stroke: blue; opacity: 0.5".to_string(),
-        );
-        rect.attributes
-            .insert("width".to_string(), "100".to_string());
+        rect.set_attr("style", "fill: red; stroke: blue; opacity: 0.5");
+        rect.set_attr("width", "100");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -372,9 +369,9 @@ mod unit_tests {
 
         // Check that styles were converted to attributes
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
-            assert_eq!(rect.attributes.get("fill"), Some(&"red".to_string()));
-            assert_eq!(rect.attributes.get("stroke"), Some(&"blue".to_string()));
-            assert_eq!(rect.attributes.get("opacity"), Some(&"0.5".to_string()));
+            assert_eq!(rect.attr("fill"), Some("red"));
+            assert_eq!(rect.attr("stroke"), Some("blue"));
+            assert_eq!(rect.attr("opacity"), Some("0.5"));
             assert!(!rect.attributes.contains_key("style"));
         }
     }
@@ -386,10 +383,8 @@ mod unit_tests {
 
         // Add element with style and existing attribute
         let mut rect = create_element("rect");
-        rect.attributes
-            .insert("style".to_string(), "fill: red; stroke: blue".to_string());
-        rect.attributes
-            .insert("fill".to_string(), "green".to_string());
+        rect.set_attr("style", "fill: red; stroke: blue");
+        rect.set_attr("fill", "green");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -397,9 +392,9 @@ mod unit_tests {
 
         // Check that existing attribute is preserved
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
-            assert_eq!(rect.attributes.get("fill"), Some(&"green".to_string()));
-            assert_eq!(rect.attributes.get("stroke"), Some(&"blue".to_string()));
-            assert_eq!(rect.attributes.get("style"), Some(&"fill: red".to_string()));
+            assert_eq!(rect.attr("fill"), Some("green"));
+            assert_eq!(rect.attr("stroke"), Some("blue"));
+            assert_eq!(rect.attr("style"), Some("fill: red"));
         }
     }
 
@@ -410,10 +405,7 @@ mod unit_tests {
 
         // Add element with non-presentation CSS properties
         let mut circle = create_element("circle");
-        circle.attributes.insert(
-            "style".to_string(),
-            "fill: green; custom-prop: value; -webkit-something: test".to_string(),
-        );
+        circle.set_attr("style", "fill: green; custom-prop: value; -webkit-something: test");
 
         doc.root.children.push(Node::Element(circle));
 
@@ -421,11 +413,8 @@ mod unit_tests {
 
         // Check that only presentation attributes were converted
         if let Some(Node::Element(circle)) = doc.root.children.get(0) {
-            assert_eq!(circle.attributes.get("fill"), Some(&"green".to_string()));
-            assert_eq!(
-                circle.attributes.get("style"),
-                Some(&"custom-prop: value; -webkit-something: test".to_string())
-            );
+            assert_eq!(circle.attr("fill"), Some("green"));
+            assert_eq!(circle.attr("style"), Some("custom-prop: value; -webkit-something: test"));
         }
     }
 
@@ -436,10 +425,7 @@ mod unit_tests {
 
         // Add element with !important declarations
         let mut rect = create_element("rect");
-        rect.attributes.insert(
-            "style".to_string(),
-            "fill: red !important; stroke: blue".to_string(),
-        );
+        rect.set_attr("style", "fill: red !important; stroke: blue");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -448,7 +434,7 @@ mod unit_tests {
         // Check that !important declaration was dropped (default behavior)
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
             assert!(!rect.attributes.contains_key("fill"));
-            assert_eq!(rect.attributes.get("stroke"), Some(&"blue".to_string()));
+            assert_eq!(rect.attr("stroke"), Some("blue"));
             assert!(!rect.attributes.contains_key("style"));
         }
     }
@@ -463,10 +449,7 @@ mod unit_tests {
 
         // Add element with !important declarations
         let mut rect = create_element("rect");
-        rect.attributes.insert(
-            "style".to_string(),
-            "fill: red !important; stroke: blue".to_string(),
-        );
+        rect.set_attr("style", "fill: red !important; stroke: blue");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -475,11 +458,8 @@ mod unit_tests {
         // Check that !important declaration was kept in style
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
             assert!(!rect.attributes.contains_key("fill"));
-            assert_eq!(rect.attributes.get("stroke"), Some(&"blue".to_string()));
-            assert_eq!(
-                rect.attributes.get("style"),
-                Some(&"fill: red !important".to_string())
-            );
+            assert_eq!(rect.attr("stroke"), Some("blue"));
+            assert_eq!(rect.attr("style"), Some("fill: red !important"));
         }
     }
 
@@ -490,10 +470,7 @@ mod unit_tests {
 
         // Add element with CSS comments in style
         let mut rect = create_element("rect");
-        rect.attributes.insert(
-            "style".to_string(),
-            "fill: /* comment */ red; stroke: blue /* another comment */".to_string(),
-        );
+        rect.set_attr("style", "fill: /* comment */ red; stroke: blue /* another comment */");
 
         doc.root.children.push(Node::Element(rect));
 
@@ -501,8 +478,8 @@ mod unit_tests {
 
         // Check that comments were stripped and styles converted
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
-            assert_eq!(rect.attributes.get("fill"), Some(&"red".to_string()));
-            assert_eq!(rect.attributes.get("stroke"), Some(&"blue".to_string()));
+            assert_eq!(rect.attr("fill"), Some("red"));
+            assert_eq!(rect.attr("stroke"), Some("blue"));
             assert!(!rect.attributes.contains_key("style"));
         }
     }

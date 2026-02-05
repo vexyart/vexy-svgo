@@ -14,6 +14,7 @@ use anyhow::Result;
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::error::VexyError;
 
 /// Plugin configuration for merge paths
 #[derive(Debug, Clone)]
@@ -408,7 +409,7 @@ impl PathMergeVisitor {
 }
 
 impl Visitor<'_> for PathMergeVisitor {
-    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<()> {
+    fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Process children to merge consecutive compatible paths
         self.merge_paths_in_children(element);
         Ok(())
@@ -430,16 +431,14 @@ mod unit_tests {
 
     fn create_path_element(d: &str) -> Element<'static> {
         let mut element = create_element("path");
-        element.attributes.insert("d".to_string(), d.to_string());
+        element.set_attr("d", d);
         element
     }
 
     fn create_path_element_with_attrs(d: &str, attrs: &[(&str, &str)]) -> Element<'static> {
         let mut element = create_path_element(d);
         for (key, value) in attrs {
-            element
-                .attributes
-                .insert(key.to_string(), value.to_string());
+            element.set_attr(*key, *value);
         }
         element
     }
@@ -545,10 +544,7 @@ mod unit_tests {
 
         if let Some(Node::Element(merged_path)) = doc.root.children.first() {
             assert_eq!(merged_path.name, "path");
-            assert_eq!(
-                merged_path.attributes.get("d"),
-                Some(&"M0 0L10 10 M20 20L30 30".to_string())
-            );
+            assert_eq!(merged_path.attr("d"), Some("M0 0L10 10 M20 20L30 30"));
         }
     }
 
@@ -591,15 +587,9 @@ mod unit_tests {
 
         if let Some(Node::Element(merged_path)) = doc.root.children.first() {
             assert_eq!(merged_path.name, "path");
-            assert_eq!(
-                merged_path.attributes.get("d"),
-                Some(&"M0 0L10 10 M20 20L30 30".to_string())
-            );
-            assert_eq!(merged_path.attributes.get("fill"), Some(&"red".to_string()));
-            assert_eq!(
-                merged_path.attributes.get("stroke"),
-                Some(&"blue".to_string())
-            );
+            assert_eq!(merged_path.attr("d"), Some("M0 0L10 10 M20 20L30 30"));
+            assert_eq!(merged_path.attr("fill"), Some("red"));
+            assert_eq!(merged_path.attr("stroke"), Some("blue"));
         }
     }
 
@@ -625,8 +615,8 @@ mod unit_tests {
         if let Some(Node::Element(merged_path)) = doc.root.children.first() {
             assert_eq!(merged_path.name, "path");
             assert_eq!(
-                merged_path.attributes.get("d"),
-                Some(&"M0 0L10 10 M20 20L30 30 M40 40L50 50".to_string())
+                merged_path.attr("d"),
+                Some("M0 0L10 10 M20 20L30 30 M40 40L50 50")
             );
         }
     }
