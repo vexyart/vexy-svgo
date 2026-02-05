@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use vexy_svgo_core::error::VexyError;
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

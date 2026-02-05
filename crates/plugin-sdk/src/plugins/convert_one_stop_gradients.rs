@@ -12,7 +12,6 @@ use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::collections::COLORS_PROPS;

@@ -5,6 +5,7 @@
 //! This module provides a bare-bones API that trades features for size.
 
 use wasm_bindgen::prelude::*;
+#[allow(unused_imports)]
 use vexy_svgo_core::{Config, PluginConfig, optimize_with_config};
 
 #[cfg(feature = "size-optimization")]

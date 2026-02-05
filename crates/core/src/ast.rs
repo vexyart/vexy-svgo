@@ -95,7 +95,7 @@ impl<'a> Document<'a> {
     }
 
     /// Returns a reference to the root element of the document.
-    pub fn root(&self) -> &Element {
+    pub fn root(&self) -> &Element<'_> {
         &self.root
     }
 
@@ -162,7 +162,7 @@ impl<'a> Element<'a> {
     }
 
     /// Returns an iterator over the element's children that are of type `Element`.
-    pub fn child_elements(&self) -> impl Iterator<Item = &Element> {
+    pub fn child_elements(&self) -> impl Iterator<Item = &Element<'_>> {
         self.children.iter().filter_map(|node| {
             if let Node::Element(element) = node {
                 Some(element)
@@ -262,7 +262,7 @@ impl<'a> Node<'a> {
 
     /// Returns a reference to the `Element` if the node is an element,
     /// otherwise returns `None`.
-    pub fn as_element(&self) -> Option<&Element> {
+    pub fn as_element(&self) -> Option<&Element<'_>> {
         if let Node::Element(element) = self {
             Some(element)
         } else {
