@@ -8,11 +8,15 @@
 //!
 //! SVGO parameters supported: None (this plugin takes no configuration)
 
-use crate::Plugin;
+use std::sync::LazyLock;
+
 use anyhow::Result;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
+
+use crate::Plugin;
 
 /// Configuration parameters for merge styles plugin (currently empty)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,8 +54,7 @@ impl MergeStylesPlugin {
     #[allow(dead_code)]
     fn parse_config(params: &Value) -> Result<MergeStylesConfig> {
         if params.is_object() {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
         } else {
             Ok(MergeStylesConfig::default())
         }
@@ -76,9 +79,7 @@ impl Plugin for MergeStylesPlugin {
     fn validate_params(&self, params: &Value) -> Result<()> {
         if let Some(obj) = params.as_object() {
             if !obj.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "mergeStyles plugin does not accept any parameters"
-                ));
+                return Err(anyhow::anyhow!("mergeStyles plugin does not accept any parameters"));
             }
         }
         Ok(())
@@ -150,13 +151,27 @@ impl MergeStylesPlugin {
         if style_data.len() > 1 {
             // Build merged CSS content
             let mut merged_css = String::new();
-            for (css, media) in &style_data {
-                if let Some(media_value) = media {
-                    merged_css.push_str(&format!("@media {}{{{}}}", media_value, css));
+            for (index, (css, media)) in style_data.iter().enumerate() {
+                let css_content = css.trim_end();
+                let normalized_content = if uses_cdata || index == 0 {
+                    css_content
                 } else {
-                    merged_css.push_str(css);
+                    css_content.trim_start()
+                };
+
+                if let Some(media_value) = media {
+                    let trimmed_len = merged_css.trim_end().len();
+                    merged_css.truncate(trimmed_len);
+                    merged_css.push_str(&format!("@media {}{{{}}}", media_value, normalized_content.trim()));
+                } else {
+                    merged_css.push_str(normalized_content);
                 }
             }
+
+            // Clean up multiple newlines to match SVGO output
+            static NEWLINE_CLEANUP_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n\s*\n").unwrap());
+            let merged_css_cow = NEWLINE_CLEANUP_RE.replace_all(&merged_css, "\n");
+            let merged_css_cleaned = merged_css_cow.to_string();
 
             // Replace the first style element with merged content
             if let Some(first_index) = first_style_index {
@@ -165,9 +180,13 @@ impl MergeStylesPlugin {
 
                 // Add merged content as appropriate node type
                 if uses_cdata {
-                    merged_style.children.push(Node::CData(merged_css));
+                    let mut cdata_content = merged_css_cleaned.trim_start().to_string();
+                    cdata_content.push_str("\n        "); // Indent closing ]]>
+                    merged_style.children.push(Node::Text("\n        ".to_string().into()));
+                    merged_style.children.push(Node::CData(cdata_content.into()));
+                    merged_style.children.push(Node::Text("\n    ".to_string().into()));
                 } else {
-                    merged_style.children.push(Node::Text(merged_css));
+                    merged_style.children.push(Node::Text(merged_css_cleaned.into()));
                 }
 
                 // Replace first style element
@@ -227,7 +246,7 @@ impl MergeStylesPlugin {
             match child {
                 Node::Text(text) => css.push_str(text),
                 Node::CData(cdata) => css.push_str(cdata),
-                _ => {}
+                _ => {},
             }
         }
         css
@@ -235,19 +254,18 @@ impl MergeStylesPlugin {
 
     /// Check if any child has CDATA content
     fn has_cdata_content(element: &Element) -> bool {
-        element
-            .children
-            .iter()
-            .any(|child| matches!(child, Node::CData(_)))
+        element.children.iter().any(|child| matches!(child, Node::CData(_)))
     }
 }
 
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
-    use serde_json::json;
     use std::borrow::Cow;
+
+    use serde_json::json;
     use vexy_svgo_core::ast::{Document, Element, Node};
+
+    use super::*;
 
     fn create_element(name: &'static str) -> Element<'static> {
         let mut element = Element::new(name);
@@ -274,9 +292,9 @@ mod unit_tests {
                 if elem.name == "style" {
                     for style_child in &elem.children {
                         match style_child {
-                            Node::Text(text) => return Some(text.clone()),
-                            Node::CData(cdata) => return Some(cdata.clone()),
-                            _ => {}
+                            Node::Text(text) => return Some(text.to_string()),
+                            Node::CData(cdata) => return Some(cdata.to_string()),
+                            _ => {},
                         }
                     }
                 }
@@ -309,13 +327,11 @@ mod unit_tests {
 
         // Create first style element
         let mut style1 = create_element("style");
-        style1.children.push(Node::Text(".a{fill:red}".to_string()));
+        style1.children.push(Node::Text(".a{fill:red}".to_string().into()));
 
         // Create second style element
         let mut style2 = create_element("style");
-        style2
-            .children
-            .push(Node::Text(".b{fill:blue}".to_string()));
+        style2.children.push(Node::Text(".b{fill:blue}".to_string().into()));
 
         // Add both styles to document
         doc.root.children.push(Node::Element(style1));
@@ -340,13 +356,11 @@ mod unit_tests {
         // Create style with media attribute
         let mut style1 = create_element("style");
         style1.set_attr("media", "print");
-        style1.children.push(Node::Text(".a{fill:red}".to_string()));
+        style1.children.push(Node::Text(".a{fill:red}".to_string().into()));
 
         // Create regular style
         let mut style2 = create_element("style");
-        style2
-            .children
-            .push(Node::Text(".b{fill:blue}".to_string()));
+        style2.children.push(Node::Text(".b{fill:blue}".to_string().into()));
 
         // Add both styles to document
         doc.root.children.push(Node::Element(style1));
@@ -370,13 +384,11 @@ mod unit_tests {
 
         // Create empty style
         let mut empty_style = create_element("style");
-        empty_style.children.push(Node::Text("   ".to_string()));
+        empty_style.children.push(Node::Text("   ".to_string().into()));
 
         // Create style with content
         let mut content_style = create_element("style");
-        content_style
-            .children
-            .push(Node::Text(".a{fill:red}".to_string()));
+        content_style.children.push(Node::Text(".a{fill:red}".to_string().into()));
 
         // Add both styles to document
         doc.root.children.push(Node::Element(empty_style));
@@ -400,15 +412,11 @@ mod unit_tests {
         // Create style with invalid type
         let mut invalid_style = create_element("style");
         invalid_style.set_attr("type", "text/javascript");
-        invalid_style
-            .children
-            .push(Node::Text("console.log('test')".to_string()));
+        invalid_style.children.push(Node::Text("console.log('test')".into()));
 
         // Create valid style
         let mut valid_style = create_element("style");
-        valid_style
-            .children
-            .push(Node::Text(".a{fill:red}".to_string()));
+        valid_style.children.push(Node::Text(".a{fill:red}".to_string().into()));
 
         // Add both styles to document
         doc.root.children.push(Node::Element(invalid_style));
@@ -428,20 +436,16 @@ mod unit_tests {
         // Create style with empty type
         let mut style1 = create_element("style");
         style1.set_attr("type", "");
-        style1.children.push(Node::Text(".a{fill:red}".to_string()));
+        style1.children.push(Node::Text(".a{fill:red}".to_string().into()));
 
         // Create style with text/css type
         let mut style2 = create_element("style");
         style2.set_attr("type", "text/css");
-        style2
-            .children
-            .push(Node::Text(".b{fill:blue}".to_string()));
+        style2.children.push(Node::Text(".b{fill:blue}".to_string().into()));
 
         // Create style with no type attribute
         let mut style3 = create_element("style");
-        style3
-            .children
-            .push(Node::Text(".c{fill:green}".to_string()));
+        style3.children.push(Node::Text(".c{fill:green}".to_string().into()));
 
         // Add all styles to document
         doc.root.children.push(Node::Element(style1));
@@ -467,15 +471,11 @@ mod unit_tests {
 
         // Create style with CDATA content
         let mut style1 = create_element("style");
-        style1
-            .children
-            .push(Node::CData(".a{fill:red}".to_string()));
+        style1.children.push(Node::CData(".a{fill:red}".into()));
 
         // Create style with text content
         let mut style2 = create_element("style");
-        style2
-            .children
-            .push(Node::Text(".b{fill:blue}".to_string()));
+        style2.children.push(Node::Text(".b{fill:blue}".to_string().into()));
 
         // Add both styles to document
         doc.root.children.push(Node::Element(style1));
@@ -519,7 +519,7 @@ mod unit_tests {
 
         // Create single style element
         let mut style = create_element("style");
-        style.children.push(Node::Text(".a{fill:red}".to_string()));
+        style.children.push(Node::Text(".a{fill:red}".to_string().into()));
         doc.root.children.push(Node::Element(style));
 
         plugin.apply(&mut doc).unwrap();

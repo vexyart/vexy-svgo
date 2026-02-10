@@ -38,13 +38,23 @@ pub fn load_fixtures(dir: &Path) -> Result<Vec<TestFixture>, Box<dyn std::error:
 
 /// Parse a fixture file in SVGO format
 fn parse_fixture(content: &str) -> Option<TestFixture> {
+    fn strip_description_block(section: &str) -> String {
+        if let Some((_, remainder)) = section.split_once("\n===\n") {
+            remainder.trim().to_string()
+        } else if let Some((_, remainder)) = section.split_once("\r\n===\r\n") {
+            remainder.trim().to_string()
+        } else {
+            section.trim().to_string()
+        }
+    }
+
     let parts: Vec<&str> = content.split("@@@").collect();
     if parts.len() < 2 {
         return None;
     }
 
-    let input = parts[0].trim().to_string();
-    let expected = parts[1].trim().to_string();
+    let input = strip_description_block(parts[0]);
+    let expected = strip_description_block(parts[1]);
     let params = parts
         .get(2)
         .and_then(|p| serde_json::from_str(p.trim()).ok());
@@ -94,6 +104,8 @@ macro_rules! plugin_fixture_tests {
                 for fixture in fixtures {
                     let mut config = Config::with_default_preset();
                     config.set_plugin_enabled($plugin_name, true);
+                    // Fixture expected outputs are trimmed and don't include trailing newlines
+                    config.js2svg.final_newline = false;
 
                     let result = vexy_svgo_core::optimize_with_config(&fixture.input, config)?;
                     assert_eq!(result.data, fixture.expected, "Fixture: {}", fixture.name);
@@ -133,6 +145,8 @@ macro_rules! plugin_fixture_tests_with_params {
                 for fixture in fixtures {
                     let mut config = Config::with_default_preset();
                     config.set_plugin_enabled($plugin_name, true);
+                    // Fixture expected outputs are trimmed and don't include trailing newlines
+                    config.js2svg.final_newline = false;
                     if let Some(params) = fixture.params {
                         config.configure_plugin($plugin_name, params);
                     }

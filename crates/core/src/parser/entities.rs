@@ -82,7 +82,7 @@ pub fn expand_entities_in_text(text: &str, entities: &HashMap<String, String>) -
 
     // Replace standard XML entities first
     result = expand_standard_entities(&result);
-    
+
     // Replace numeric character references (&#123; or &#x7B;)
     result = expand_numeric_entities(&result);
 
@@ -108,29 +108,33 @@ pub fn expand_standard_entities(text: &str) -> String {
 pub fn expand_numeric_entities(text: &str) -> String {
     // Handle decimal numeric character references (&#123;)
     let decimal_pattern = regex::Regex::new(r"&#(\d+);?").unwrap();
-    let mut result = decimal_pattern.replace_all(text, |caps: &regex::Captures| {
-        if let Some(num_str) = caps.get(1) {
-            if let Ok(code_point) = num_str.as_str().parse::<u32>() {
-                if let Some(ch) = std::char::from_u32(code_point) {
-                    return ch.to_string();
+    let mut result = decimal_pattern
+        .replace_all(text, |caps: &regex::Captures| {
+            if let Some(num_str) = caps.get(1) {
+                if let Ok(code_point) = num_str.as_str().parse::<u32>() {
+                    if let Some(ch) = std::char::from_u32(code_point) {
+                        return ch.to_string();
+                    }
                 }
             }
-        }
-        caps[0].to_string() // Return original if parsing fails
-    }).into_owned();
+            caps[0].to_string() // Return original if parsing fails
+        })
+        .into_owned();
 
     // Handle hexadecimal numeric character references (&#x7B; or &#X7B;)
     let hex_pattern = regex::Regex::new(r"&#[xX]([0-9a-fA-F]+);?").unwrap();
-    result = hex_pattern.replace_all(&result, |caps: &regex::Captures| {
-        if let Some(hex_str) = caps.get(1) {
-            if let Ok(code_point) = u32::from_str_radix(hex_str.as_str(), 16) {
-                if let Some(ch) = std::char::from_u32(code_point) {
-                    return ch.to_string();
+    result = hex_pattern
+        .replace_all(&result, |caps: &regex::Captures| {
+            if let Some(hex_str) = caps.get(1) {
+                if let Ok(code_point) = u32::from_str_radix(hex_str.as_str(), 16) {
+                    if let Some(ch) = std::char::from_u32(code_point) {
+                        return ch.to_string();
+                    }
                 }
             }
-        }
-        caps[0].to_string() // Return original if parsing fails
-    }).into_owned();
+            caps[0].to_string() // Return original if parsing fails
+        })
+        .into_owned();
 
     result
 }

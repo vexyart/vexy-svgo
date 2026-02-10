@@ -1,7 +1,8 @@
 # Vexy SVGO - SVG Optimizer Next-generation
 
 [![CI Status](https://github.com/vexyart/vexy-svgo/workflows/CI/badge.svg)](https://github.com/vexyart/vexy-svgo/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://vexyart.github.io/vexy-svgo/)
+[![Documentation](https://docs.rs/vexy-svgo-core/badge.svg)](https://docs.rs/vexy-svgo-core)
+[![Docs.rs](https://img.shields.io/badge/docs.rs-vexy--svgo-blue)](https://docs.rs/vexy-svgo-core)
 [![Crates.io](https://img.shields.io/crates/v/vexy-svgo.svg)](https://crates.io/crates/vexy-svgo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Coverage](https://codecov.io/gh/vexyart/vexy-svgo/branch/main/graph/badge.svg)](https://codecov.io/gh/vexyart/vexy-svgo)
@@ -110,6 +111,29 @@ const result = await optimize(svgString, {
 });
 console.log(result.data);
 ```
+
+### **Rust API**
+View full documentation on [docs.rs](https://docs.rs/vexy-svgo-core).
+
+```rust
+use vexy_svgo_core::{optimize_default, parse_svg, stringify, config::DefaultPreset};
+
+// Simple optimization with default preset
+let svg = r#"<svg><rect width="100" height="100"/></svg>"#;
+let result = optimize_default(svg).unwrap();
+println!("Optimized: {} ({} bytes)", result.data, result.original_size - result.optimized_size);
+
+// Custom configuration
+let doc = parse_svg(svg).unwrap();
+let optimized = vexy_svgo_core::optimize(&doc, &DefaultPreset::new()).unwrap();
+let output = stringify(&optimized).unwrap();
+```
+
+**Core crates documented on docs.rs:**
+- [vexy-svgo-core](https://docs.rs/vexy-svgo-core) - Core optimization engine
+- [vexy-svgo-plugin-sdk](https://docs.rs/vexy-svgo-plugin-sdk) - Plugin development SDK
+- [vexy-svgo-ffi](https://docs.rs/vexy-svgo-ffi) - C-compatible FFI bindings
+- [vexy-svgo-wasm](https://docs.rs/vexy-svgo-wasm) - WebAssembly bindings
 
 ## 🏗️ Architecture
 
@@ -222,7 +246,7 @@ Vexy SVGO implements all 53 SVGO plugins with identical functionality:
 ## 🔧 Building from Source
 
 ### **Prerequisites**
-- Rust 1.70+ (2021 edition)
+- Rust 1.74+ (2021 edition, MSRV enforced by CI)
 - Git
 
 ### **Build Steps**
@@ -258,7 +282,7 @@ cargo test --package vexy-svgo-plugin-sdk
 
 ## 📚 Documentation
 
-- **[API Documentation](https://twardoch.github.io/vexy-svgo/)**
+- **[Rust API Documentation (docs.rs)](https://docs.rs/vexy-svgo-core)**
 - **[Plugin Reference](https://twardoch.github.io/vexy-svgo/plugins.html)**
 - **[Release Notes](RELEASE_CANDIDATE.md)**
 - **[Migration Guide](https://vexyart.github.io/vexy-svgo/migration.html)**
@@ -304,6 +328,21 @@ cargo test --package vexy-svgo-plugin-sdk
 
 # Run benchmarks
 cargo bench
+```
+
+### **Fuzz Testing**
+```bash
+# Install cargo-fuzz (first time)
+cargo install cargo-fuzz
+
+# List fuzz targets
+cargo fuzz list
+
+# Run a fuzz target for 60 seconds
+cargo fuzz run fuzz_svg_parser -- -max_total_time=60
+
+# View the full fuzzing guide
+cat FUZZING.md
 ```
 
 ## 🐛 Issues & Support

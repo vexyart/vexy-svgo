@@ -6,8 +6,10 @@
 //! in memory. The AST is designed for efficient traversal and mutation during
 //! optimization passes, with memory optimizations for common use cases.
 
-use indexmap::IndexMap;
 use std::borrow::Cow;
+
+use bumpalo::Bump;
+use indexmap::IndexMap;
 
 /// Represents a complete SVG document, including the root element,
 /// surrounding nodes, and metadata.
@@ -15,24 +17,28 @@ use std::borrow::Cow;
 pub struct Document<'a> {
     /// A list of nodes that appear before the root `<svg>` element,
     /// such as comments or processing instructions.
-    pub prologue: Vec<Node<'a>>,
+    pub prologue:      Vec<Node<'a>>,
     /// The root `<svg>` element of the document.
-    pub root: Element<'a>,
+    pub root:          Element<'a>,
     /// A list of nodes that appear after the root `<svg>` element.
-    pub epilogue: Vec<Node<'a>>,
+    pub epilogue:      Vec<Node<'a>>,
     /// Metadata associated with the document, such as file path and encoding.
-    pub metadata: DocumentMetadata,
+    pub metadata:      DocumentMetadata,
+    /// Optional memory budget for tracking allocations during optimization
+    pub memory_budget: Option<std::sync::Arc<crate::optimizer::memory::MemoryBudget>>,
 }
 
 /// Contains metadata about the SVG document.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DocumentMetadata {
     /// The original file path of the document, if available.
-    pub path: Option<String>,
+    pub path:       Option<String>,
     /// The character encoding of the document, e.g., "UTF-8".
-    pub encoding: Option<String>,
+    pub encoding:   Option<String>,
     /// The XML version specified in the document, e.g., "1.0".
-    pub version: Option<String>,
+    pub version:    Option<String>,
+    /// The standalone attribute in the XML declaration, e.g., "no".
+    pub standalone: Option<String>,
 }
 
 /// Represents an XML element within the SVG document.
@@ -44,53 +50,79 @@ pub struct Element<'a> {
     ///
     /// Using `Cow` allows for borrowing the name from the input string
     /// when possible, or owning it if it needs to be modified.
-    pub name: Cow<'a, str>,
+    pub name:       Cow<'a, str>,
     /// A map of the element's attributes.
     /// Using IndexMap for consistent ordering and better performance.
     pub attributes: IndexMap<Cow<'a, str>, Cow<'a, str>>,
     /// A map of the element's child nodes.
     /// Pre-allocated with capacity for common cases to reduce reallocations.
-    pub children: Vec<Node<'a>>,
+    pub children:   Vec<Node<'a>>,
     /// A map of namespace declarations for this element.
     /// Using IndexMap for consistent ordering.
-    pub namespaces: IndexMap<String, String>,
+    /// Uses Box<str> for immutable namespace URIs to reduce memory overhead.
+    pub namespaces: IndexMap<Box<str>, Box<str>>,
 }
 
 /// An enum representing the different types of nodes that can exist
 /// in the SVG document tree.
-/// 
+///
 /// Memory optimization notes:
-/// - Using `Box<str>` for strings where possible to reduce memory overhead
-/// - Considering compact representations for common node types
+/// - Using `Box<str>` for immutable text content (8 bytes saved per string, no capacity overhead)
+/// - Text nodes are created once during parsing and never mutated
+/// - `Box<str>` derefs to `&str` automatically, maintaining API compatibility
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node<'a> {
     /// An XML element, represented by the `Element` struct.
     Element(Element<'a>),
-    /// A text node - using String for now, could be optimized to `Box<str>`
-    Text(String),
-    /// An XML comment - using String for now, could be optimized to `Box<str>`
-    Comment(String),
-    /// An XML processing instruction.
+    /// A text node - immutable after parsing, uses Box<str> for memory efficiency
+    Text(Box<str>),
+    /// An XML comment - immutable after parsing, uses Box<str> for memory efficiency
+    Comment(Box<str>),
+    /// An XML processing instruction - immutable after parsing
     ProcessingInstruction {
         /// The target of the processing instruction.
-        target: String,
+        target: Box<str>,
         /// The data of the processing instruction.
-        data: String,
+        data:   Box<str>,
     },
-    /// A CDATA section, which is used for escaping blocks of text.
-    CData(String),
-    /// A DOCTYPE declaration.
-    DocType(String),
+    /// A CDATA section - immutable after parsing, uses Box<str> for memory efficiency
+    CData(Box<str>),
+    /// A DOCTYPE declaration - immutable after parsing, uses Box<str> for memory efficiency
+    DocType(Box<str>),
 }
 
 impl<'a> Document<'a> {
     /// Creates a new, empty `Document` with a default `<svg>` root element.
+    /// Uses Box allocation for all strings (backward-compatible default).
     pub fn new() -> Self {
         Self {
-            prologue: Vec::new(),
-            root: Element::new("svg"),
-            epilogue: Vec::new(),
-            metadata: DocumentMetadata::default(),
+            prologue:      Vec::new(),
+            root:          Element::new("svg"),
+            epilogue:      Vec::new(),
+            metadata:      DocumentMetadata::default(),
+            memory_budget: None,
+        }
+    }
+
+    /// Creates a new `Document` using arena allocation for strings.
+    /// This reduces heap allocations by allocating all strings in a single bump allocator.
+    /// The document takes ownership of the arena lifetime.
+    ///
+    /// # Example
+    /// ```
+    /// use bumpalo::Bump;
+    /// use vexy_svgo_core::ast::Document;
+    ///
+    /// let arena = Bump::new();
+    /// let doc = Document::new_in(&arena);
+    /// ```
+    pub fn new_in(arena: &'a Bump) -> Self {
+        Self {
+            prologue:      Vec::new(),
+            root:          Element::new_in("svg", arena),
+            epilogue:      Vec::new(),
+            metadata:      DocumentMetadata::default(),
+            memory_budget: None,
         }
     }
 
@@ -103,6 +135,17 @@ impl<'a> Document<'a> {
     pub fn root_mut(&mut self) -> &mut Element<'a> {
         &mut self.root
     }
+
+    /// Set a memory budget for this document
+    pub fn with_memory_budget(mut self, budget: std::sync::Arc<crate::optimizer::memory::MemoryBudget>) -> Self {
+        self.memory_budget = Some(budget);
+        self
+    }
+
+    /// Get the memory budget if set
+    pub fn memory_budget(&self) -> Option<&std::sync::Arc<crate::optimizer::memory::MemoryBudget>> {
+        self.memory_budget.as_ref()
+    }
 }
 
 impl<'a> Element<'a> {
@@ -110,11 +153,23 @@ impl<'a> Element<'a> {
     /// Pre-allocates reasonable capacity for attributes and children to reduce reallocations.
     pub fn new(name: impl Into<Cow<'a, str>>) -> Self {
         Self {
-            name: name.into(),
+            name:       name.into(),
             // Pre-allocate capacity for a few attributes - most SVG elements have 1-4 attributes
             attributes: IndexMap::with_capacity(4),
-            children: Vec::new(),
+            children:   Vec::new(),
             // Most elements don't have namespace declarations, so start empty
+            namespaces: IndexMap::new(),
+        }
+    }
+
+    /// Creates a new `Element` using arena allocation for strings.
+    /// The name is allocated in the arena, reducing heap allocations.
+    pub fn new_in(name: &str, arena: &'a Bump) -> Self {
+        let name_in_arena = arena.alloc_str(name);
+        Self {
+            name:       Cow::Borrowed(name_in_arena),
+            attributes: IndexMap::with_capacity(4),
+            children:   Vec::new(),
             namespaces: IndexMap::new(),
         }
     }
@@ -123,9 +178,9 @@ impl<'a> Element<'a> {
     /// This allows for better memory allocation when the number of children is known.
     pub fn with_capacity(name: impl Into<Cow<'a, str>>, children_capacity: usize) -> Self {
         Self {
-            name: name.into(),
+            name:       name.into(),
             attributes: IndexMap::with_capacity(4),
-            children: Vec::with_capacity(children_capacity),
+            children:   Vec::with_capacity(children_capacity),
             namespaces: IndexMap::new(),
         }
     }
@@ -154,6 +209,37 @@ impl<'a> Element<'a> {
     /// Adds a `Node` to the element's list of children.
     pub fn add_child(&mut self, child: Node<'a>) {
         self.children.push(child);
+    }
+
+    /// Adds a child with memory budget checking
+    pub fn add_child_checked(
+        &mut self,
+        child: Node<'a>,
+        budget: Option<&std::sync::Arc<crate::optimizer::memory::MemoryBudget>>,
+    ) -> Result<(), crate::error::VexyError> {
+        if let Some(budget) = budget {
+            let size = crate::optimizer::memory::estimator::estimate_child_addition(&child);
+            budget.allocate(size)?;
+        }
+        self.children.push(child);
+        Ok(())
+    }
+
+    /// Sets attribute with memory budget checking
+    pub fn set_attr_checked(
+        &mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        budget: Option<&std::sync::Arc<crate::optimizer::memory::MemoryBudget>>,
+    ) -> Result<(), crate::error::VexyError> {
+        let name = name.into();
+        let value = value.into();
+        if let Some(budget) = budget {
+            let size = crate::optimizer::memory::estimator::estimate_attribute_addition(&name, &value);
+            budget.allocate(size)?;
+        }
+        self.attributes.insert(Cow::Owned(name), Cow::Owned(value));
+        Ok(())
     }
 
     /// Removes all children from the element.
@@ -201,25 +287,25 @@ impl<'a> Element<'a> {
     /// This is useful for memory profiling and optimization.
     pub fn estimated_memory_usage(&self) -> usize {
         let mut usage = std::mem::size_of::<Self>();
-        
+
         // Add name size
         usage += self.name.len();
-        
+
         // Add attributes
         for (key, value) in &self.attributes {
             usage += std::mem::size_of::<String>() * 2 + key.len() + value.len();
         }
-        
-        // Add namespaces
+
+        // Add namespaces (Box<str> is 16 bytes on 64-bit: ptr + len)
         for (key, value) in &self.namespaces {
-            usage += std::mem::size_of::<String>() * 2 + key.len() + value.len();
+            usage += std::mem::size_of::<Box<str>>() * 2 + key.len() + value.len();
         }
-        
+
         // Add children recursively
         for child in &self.children {
             usage += child.estimated_memory_usage();
         }
-        
+
         usage
     }
 
@@ -229,7 +315,7 @@ impl<'a> Element<'a> {
         self.attributes.shrink_to_fit();
         self.namespaces.shrink_to_fit();
         self.children.shrink_to_fit();
-        
+
         // Recursively optimize children
         for child in &mut self.children {
             if let Node::Element(element) = child {
@@ -280,9 +366,9 @@ impl<'a> Node<'a> {
         }
     }
 
-    /// Returns a reference to the `String` if the node is a text node,
+    /// Returns a reference to the text content if the node is a text node,
     /// otherwise returns `None`.
-    pub fn as_text(&self) -> Option<&String> {
+    pub fn as_text(&self) -> Option<&str> {
         if let Node::Text(text) = self {
             Some(text)
         } else {
@@ -294,13 +380,13 @@ impl<'a> Node<'a> {
     pub fn estimated_memory_usage(&self) -> usize {
         match self {
             Node::Element(element) => element.estimated_memory_usage(),
-            Node::Text(text) => std::mem::size_of::<String>() + text.len(),
-            Node::Comment(comment) => std::mem::size_of::<String>() + comment.len(),
+            Node::Text(text) => std::mem::size_of::<Box<str>>() + text.len(),
+            Node::Comment(comment) => std::mem::size_of::<Box<str>>() + comment.len(),
             Node::ProcessingInstruction { target, data } => {
-                std::mem::size_of::<String>() * 2 + target.len() + data.len()
-            }
-            Node::CData(cdata) => std::mem::size_of::<String>() + cdata.len(),
-            Node::DocType(doctype) => std::mem::size_of::<String>() + doctype.len(),
+                std::mem::size_of::<Box<str>>() * 2 + target.len() + data.len()
+            },
+            Node::CData(cdata) => std::mem::size_of::<Box<str>>() + cdata.len(),
+            Node::DocType(doctype) => std::mem::size_of::<Box<str>>() + doctype.len(),
         }
     }
 }
@@ -349,8 +435,8 @@ mod tests {
         let child = Element::new("rect");
 
         parent.add_child(Node::Element(child));
-        parent.add_child(Node::Text("test".to_string()));
-        parent.add_child(Node::Comment("comment".to_string()));
+        parent.add_child(Node::Text("test".into()));
+        parent.add_child(Node::Comment("comment".into()));
 
         assert_eq!(parent.children.len(), 3);
         assert_eq!(parent.child_elements().count(), 1);
@@ -360,12 +446,12 @@ mod tests {
     #[test]
     fn test_whitespace_detection() {
         let mut element = Element::new("g");
-        element.add_child(Node::Text("   \n  ".to_string()));
-        element.add_child(Node::Comment("comment".to_string()));
+        element.add_child(Node::Text("   \n  ".into()));
+        element.add_child(Node::Comment("comment".into()));
 
         assert!(element.is_whitespace_only());
 
-        element.add_child(Node::Text("content".to_string()));
+        element.add_child(Node::Text("content".into()));
         assert!(!element.is_whitespace_only());
     }
 
@@ -374,11 +460,11 @@ mod tests {
         let mut element = Element::new("rect");
         element.set_attr("x", "10");
         element.set_attr("y", "20");
-        element.add_child(Node::Text("content".to_string()));
+        element.add_child(Node::Text("content".into()));
 
         let usage = element.estimated_memory_usage();
         assert!(usage > 0);
-        
+
         // Should include element size, attribute sizes, and child sizes
         let base_size = std::mem::size_of::<Element>();
         assert!(usage >= base_size);
@@ -387,14 +473,14 @@ mod tests {
     #[test]
     fn test_memory_optimization() {
         let mut element = Element::with_capacity("g", 100);
-        
+
         // Add only a few children, leaving most capacity unused
-        element.add_child(Node::Text("test".to_string()));
-        element.add_child(Node::Comment("comment".to_string()));
-        
+        element.add_child(Node::Text("test".into()));
+        element.add_child(Node::Comment("comment".into()));
+
         // Before optimization, capacity should be 100
         assert_eq!(element.children.capacity(), 100);
-        
+
         // After optimization, capacity should be reduced to fit
         element.optimize_memory();
         assert_eq!(element.children.capacity(), 2);
@@ -402,11 +488,11 @@ mod tests {
 
     #[test]
     fn test_node_memory_usage() {
-        let text_node = Node::Text("Hello, World!".to_string());
-        let comment_node = Node::Comment("This is a comment".to_string());
+        let text_node = Node::Text("Hello, World!".into());
+        let comment_node = Node::Comment("This is a comment".into());
         let pi_node = Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "version=\"1.0\"".to_string(),
+            target: "xml".into(),
+            data:   "version=\"1.0\"".into(),
         };
 
         assert!(text_node.estimated_memory_usage() > 0);

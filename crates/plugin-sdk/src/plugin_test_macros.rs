@@ -30,11 +30,18 @@ macro_rules! plugin_fixture_tests {
                 let fixtures = load_fixtures(&fixtures_path)?;
 
                 for fixture in fixtures {
-                    let mut config = Config::with_default_preset();
-                    config.set_plugin_enabled($plugin_name, true);
+                    let mut config = Config::new();
+                    config.plugins = vec![
+                        vexy_svgo_core::PluginConfig::Name($plugin_name.to_string()),
+                    ];
+                    config.js2svg.pretty = true;
+                    config.js2svg.indent = "    ".to_string();
+                    config.js2svg.final_newline = false;
 
-                    let result = vexy_svgo_core::optimize_with_config(&fixture.input, config)?;
-                    assert_eq!(result.data, fixture.expected, "Fixture: {}", fixture.name);
+                    let registry = crate::registry::create_migrated_plugin_registry();
+                    let options = vexy_svgo_core::OptimizeOptions::new(config).with_registry(registry);
+                    let result = vexy_svgo_core::optimize(&fixture.input, options)?;
+                    assert_eq!(result.data, fixture.expected, "Fixture: {} (Path: {:?})", fixture.name, fixtures_path.join(fixture.name.clone()));
                 }
                 Ok(())
             }
@@ -69,14 +76,21 @@ macro_rules! plugin_fixture_tests_with_params {
                 let fixtures = load_fixtures(&fixtures_path)?;
 
                 for fixture in fixtures {
-                    let mut config = Config::with_default_preset();
-                    config.set_plugin_enabled($plugin_name, true);
+                    let mut config = Config::new();
+                    config.plugins = vec![
+                        vexy_svgo_core::PluginConfig::Name($plugin_name.to_string()),
+                    ];
                     if let Some(params) = fixture.params {
                         config.configure_plugin($plugin_name, params);
                     }
+                    config.js2svg.pretty = true;
+                    config.js2svg.indent = "    ".to_string();
+                    config.js2svg.final_newline = false;
 
-                    let result = vexy_svgo_core::optimize_with_config(&fixture.input, config)?;
-                    assert_eq!(result.data, fixture.expected, "Fixture: {}", fixture.name);
+                    let registry = crate::registry::create_migrated_plugin_registry();
+                    let options = vexy_svgo_core::OptimizeOptions::new(config).with_registry(registry);
+                    let result = vexy_svgo_core::optimize(&fixture.input, options)?;
+                    assert_eq!(result.data, fixture.expected, "Fixture: {} (Path: {:?})", fixture.name, fixtures_path.join(fixture.name.clone()));
                 }
                 Ok(())
             }

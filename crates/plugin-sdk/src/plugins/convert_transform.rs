@@ -471,6 +471,7 @@ mod tests {
     use super::*;
     use indexmap::IndexMap;
     use serde_json::json;
+    use std::borrow::Cow;
 
     fn create_test_element_with_transform(transform: &str) -> Element {
         let mut attributes = IndexMap::new();

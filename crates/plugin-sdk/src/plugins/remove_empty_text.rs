@@ -205,7 +205,7 @@ mod unit_tests {
         let mut text_with_content = create_element("text");
         text_with_content
             .children
-            .push(Node::Text("Hello".to_string()));
+            .push(Node::Text("Hello".to_string().into()));
         doc.root.children.push(Node::Element(text_with_content));
 
         // Add a regular element
@@ -233,7 +233,7 @@ mod unit_tests {
         let mut tspan_with_content = create_element("tspan");
         tspan_with_content
             .children
-            .push(Node::Text("World".to_string()));
+            .push(Node::Text("World".to_string().into()));
         doc.root.children.push(Node::Element(tspan_with_content));
 
         // Apply plugin
@@ -384,7 +384,7 @@ mod unit_tests {
         let mut text_with_content = create_element("text");
         text_with_content
             .children
-            .push(Node::Text("Hello".to_string()));
+            .push(Node::Text("Hello".to_string().into()));
         doc.root.children.push(Node::Element(text_with_content));
 
         let rect = create_element("rect");

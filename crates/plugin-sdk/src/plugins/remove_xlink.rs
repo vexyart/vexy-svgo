@@ -218,7 +218,7 @@ impl RemoveXlinkPlugin {
                         name: "title".to_string().into(),
                         attributes: indexmap::IndexMap::new(),
                         namespaces: indexmap::IndexMap::new(),
-                        children: vec![Node::Text(title_value.to_string())],
+                        children: vec![Node::Text(title_value.to_string().into())],
                     };
                     element.children.insert(0, Node::Element(title_element));
                 }
@@ -469,7 +469,7 @@ mod tests {
                 assert_eq!(title.name, "title");
                 assert_eq!(title.children.len(), 1);
                 if let Node::Text(ref text) = title.children[0] {
-                    assert_eq!(text, "Element title");
+                    assert_eq!(text.as_ref(), "Element title");
                 } else {
                     panic!("Expected text in title");
                 }

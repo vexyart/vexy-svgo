@@ -142,7 +142,7 @@ fn bench_stringify_mixed_content(c: &mut Criterion) {
     let mut root = Element::new("svg");
     
     // Add various types of content
-    root.add_child(Node::Comment("This is a comment".to_string()));
+    root.add_child(Node::Comment("This is a comment".to_string().into_boxed_str()));
     
     let mut group = Element::new("g");
     group.add_child(Node::Text("Some text".to_string()));

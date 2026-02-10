@@ -5,9 +5,10 @@
 //! This module provides a centralized way to manage feature flags across the project,
 //! allowing for conditional compilation and runtime feature detection.
 
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fmt;
+
+use once_cell::sync::Lazy;
 
 /// Feature flags available in Vexy SVGO
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,7 +55,7 @@ impl FeatureFlags {
     /// Create a new feature flag configuration with defaults
     pub fn new() -> Self {
         let mut enabled = HashMap::new();
-        
+
         // Default feature states
         enabled.insert(Feature::ParallelProcessing, cfg!(feature = "parallel"));
         enabled.insert(Feature::StreamingParser, true);
@@ -64,17 +65,15 @@ impl FeatureFlags {
         enabled.insert(Feature::DebugMode, cfg!(debug_assertions));
         enabled.insert(Feature::WasmOptimizations, cfg!(target_arch = "wasm32"));
         enabled.insert(Feature::MemoryProfiling, cfg!(feature = "memory-profiling"));
-        
-        Self {
-            enabled,
-        }
+
+        Self { enabled }
     }
-    
+
     /// Check if a feature is enabled
     pub fn is_enabled(&self, feature: Feature) -> bool {
         self.enabled.get(&feature).copied().unwrap_or(false)
     }
-    
+
     /// Enable a feature at runtime (if supported)
     pub fn enable(&mut self, feature: Feature) -> Result<(), FeatureError> {
         // Check if feature requires compile-time support
@@ -89,35 +88,28 @@ impl FeatureFlags {
                 } {
                     return Err(FeatureError::RequiresCompileTimeSupport(feature));
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
-        
+
         self.enabled.insert(feature, true);
         Ok(())
     }
-    
+
     /// Disable a feature at runtime
     pub fn disable(&mut self, feature: Feature) {
         self.enabled.insert(feature, false);
     }
-    
+
     /// Get all enabled features
     pub fn enabled_features(&self) -> Vec<Feature> {
-        self.enabled
-            .iter()
-            .filter_map(|(f, &enabled)| if enabled { Some(*f) } else { None })
-            .collect()
+        self.enabled.iter().filter_map(|(f, &enabled)| if enabled { Some(*f) } else { None }).collect()
     }
 }
 
 impl fmt::Display for FeatureFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let features: Vec<String> = self
-            .enabled_features()
-            .iter()
-            .map(|f| format!("{f:?}"))
-            .collect();
+        let features: Vec<String> = self.enabled_features().iter().map(|f| format!("{f:?}")).collect();
         write!(f, "Features: [{}]", features.join(", "))
     }
 }
@@ -133,13 +125,13 @@ impl Default for FeatureFlags {
 pub enum FeatureError {
     #[error("Feature {0} requires compile-time support")]
     RequiresCompileTimeSupport(Feature),
-    
+
     #[error("Feature {0} is not available on this platform")]
     NotAvailableOnPlatform(Feature),
 }
 
 /// Global feature flags instance
-pub static FEATURES: Lazy<parking_lot::RwLock<FeatureFlags>> = 
+pub static FEATURES: Lazy<parking_lot::RwLock<FeatureFlags>> =
     Lazy::new(|| parking_lot::RwLock::new(FeatureFlags::new()));
 
 /// Check if a feature is enabled globally
@@ -192,47 +184,47 @@ macro_rules! debug_log {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_feature_flags_default() {
         let flags = FeatureFlags::new();
-        
+
         // Streaming parser should be enabled by default
         assert!(flags.is_enabled(Feature::StreamingParser));
-        
+
         // Debug mode depends on compilation mode
         assert_eq!(flags.is_enabled(Feature::DebugMode), cfg!(debug_assertions));
     }
-    
+
     #[test]
     fn test_enable_disable_features() {
         let mut flags = FeatureFlags::new();
-        
+
         // Enable experimental plugins
         flags.enable(Feature::ExperimentalPlugins).ok();
         assert!(flags.is_enabled(Feature::ExperimentalPlugins));
-        
+
         // Disable it
         flags.disable(Feature::ExperimentalPlugins);
         assert!(!flags.is_enabled(Feature::ExperimentalPlugins));
     }
-    
+
     #[test]
     fn test_compile_time_features() {
         let mut flags = FeatureFlags::new();
-        
+
         // Try to enable a compile-time feature when not compiled with it
         if !cfg!(feature = "lyon") {
             let result = flags.enable(Feature::GeometricOptimizations);
             assert!(result.is_err());
         }
     }
-    
+
     #[test]
     fn test_enabled_features_list() {
         let flags = FeatureFlags::new();
         let enabled = flags.enabled_features();
-        
+
         // Should have at least streaming parser
         assert!(enabled.contains(&Feature::StreamingParser));
     }

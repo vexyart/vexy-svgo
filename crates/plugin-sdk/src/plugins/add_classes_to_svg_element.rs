@@ -24,6 +24,7 @@ pub struct AddClassesToSVGElementConfig {
     pub class_name: Option<String>,
     /// Array of class names to add
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(alias = "classes")]
     pub class_names: Option<Vec<String>>,
 }
 
@@ -81,30 +82,32 @@ impl AddClassesToSVGElementPlugin {
             classes_to_add.extend(class_names.iter().cloned());
         }
 
-        // Get existing classes
-        let mut class_set: HashSet<String> =
-            if let Some(existing_class) = element.attributes.get("class") {
-                existing_class
-                    .split_whitespace()
-                    .map(|s| s.to_string())
-                    .collect()
-            } else {
-                HashSet::new()
-            };
+        // Preserve class order while deduplicating
+        let mut class_list: Vec<String> = Vec::new();
+        let mut class_set: HashSet<String> = HashSet::new();
+
+        if let Some(existing_class) = element.attributes.get("class") {
+            for class_name in existing_class.split_whitespace() {
+                if class_set.insert(class_name.to_string()) {
+                    class_list.push(class_name.to_string());
+                }
+            }
+        }
 
         // Add new classes
         for class_name in classes_to_add {
-            if !class_name.is_empty() {
-                class_set.insert(class_name);
+            if !class_name.is_empty() && class_set.insert(class_name.clone()) {
+                class_list.push(class_name);
             }
         }
 
         // Update class attribute
-        if !class_set.is_empty() {
-            let class_string = class_set.into_iter().collect::<Vec<_>>().join(" ");
+        if !class_list.is_empty() {
+            let class_string = class_list.join(" ");
             element.attributes.insert("class".into(), class_string.into());
         }
     }
+
 }
 
 impl Default for AddClassesToSVGElementPlugin {
@@ -135,6 +138,11 @@ impl Plugin for AddClassesToSVGElementPlugin {
             ));
         }
 
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &Value) -> anyhow::Result<()> {
+        self.config = Self::parse_config(params)?;
         Ok(())
     }
 
@@ -385,4 +393,4 @@ mod unit_tests {
 }
 
 // Use parameterized testing framework for SVGO fixture tests
-crate::plugin_fixture_tests!(AddClassesToSVGElementPlugin, "addClassesToSVGElement");
+crate::plugin_fixture_tests_with_params!(AddClassesToSVGElementPlugin, "addClassesToSVGElement");

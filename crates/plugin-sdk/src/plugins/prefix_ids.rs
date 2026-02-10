@@ -7,7 +7,6 @@
 //!
 //! Reference: SVGO's prefixIds plugin
 
-use crate::Plugin;
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -15,19 +14,21 @@ use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::collections::REFERENCES_PROPS;
 
+use crate::Plugin;
+
 /// Configuration for the prefix IDs plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PrefixIdsConfig {
     /// The prefix to use. Can be a string or auto-generated from file path
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
+    pub prefix:             Option<String>,
     /// Delimiter between prefix and original ID
     #[serde(default = "default_delim")]
-    pub delim: String,
+    pub delim:              String,
     /// Whether to prefix IDs
     #[serde(default = "default_true")]
-    pub prefix_ids: bool,
+    pub prefix_ids:         bool,
     /// Whether to prefix class names
     #[serde(default = "default_true")]
     pub prefix_class_names: bool,
@@ -44,9 +45,9 @@ fn default_true() -> bool {
 impl Default for PrefixIdsConfig {
     fn default() -> Self {
         Self {
-            prefix: None,
-            delim: default_delim(),
-            prefix_ids: default_true(),
+            prefix:             None,
+            delim:              default_delim(),
+            prefix_ids:         default_true(),
             prefix_class_names: default_true(),
         }
     }
@@ -72,8 +73,7 @@ impl PrefixIdsPlugin {
         if params.is_null() {
             Ok(PrefixIdsConfig::default())
         } else {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
         }
     }
 
@@ -99,11 +99,7 @@ impl PrefixIdsPlugin {
         if let Some(path) = &document.metadata.path {
             let basename = Self::get_basename(path);
             if !basename.is_empty() {
-                return format!(
-                    "{}{}",
-                    Self::escape_identifier_name(&basename),
-                    self.config.delim
-                );
+                return format!("{}{}", Self::escape_identifier_name(&basename), self.config.delim);
             }
         }
 
@@ -119,9 +115,7 @@ impl PrefixIdsPlugin {
     }
 
     fn prefix_reference(&self, prefix: &str, reference: &str) -> Option<String> {
-        reference
-            .strip_prefix('#')
-            .map(|id| format!("#{}", self.prefix_id(prefix, id)))
+        reference.strip_prefix('#').map(|id| format!("#{}", self.prefix_id(prefix, id)))
     }
 
     fn process_element(&self, element: &mut Element, prefix: &str) {
@@ -138,10 +132,8 @@ impl PrefixIdsPlugin {
         if self.config.prefix_class_names {
             if let Some(class) = element.attr("class") {
                 if !class.is_empty() {
-                    let classes: Vec<String> = class
-                        .split_whitespace()
-                        .map(|name| self.prefix_id(prefix, name))
-                        .collect();
+                    let classes: Vec<String> =
+                        class.split_whitespace().map(|name| self.prefix_id(prefix, name)).collect();
                     element.set_attr("class", classes.join(" "));
                 }
             }
@@ -185,8 +177,8 @@ impl PrefixIdsPlugin {
                 match child {
                     Node::Text(text) => {
                         let processed = self.process_style_content(text, prefix);
-                        new_children.push(Node::Text(processed));
-                    }
+                        new_children.push(Node::Text(processed.into()));
+                    },
                     _ => new_children.push(child.clone()),
                 }
             }
@@ -334,25 +326,28 @@ impl Plugin for PrefixIdsPlugin {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indexmap::IndexMap;
     use vexy_svgo_core::ast::{Document, DocumentMetadata, Element};
 
+    use super::*;
+
     fn create_test_document() -> Document<'static> {
         Document {
-            root: Element {
-                name: "svg".into(),
+            root:          Element {
+                name:       "svg".into(),
                 attributes: IndexMap::new(),
                 namespaces: IndexMap::new(),
-                children: vec![],
+                children:   vec![],
             },
-            prologue: vec![],
-            epilogue: vec![],
-            metadata: DocumentMetadata {
-                path: None,
-                encoding: None,
-                version: None,
+            prologue:      vec![],
+            epilogue:      vec![],
+            metadata:      DocumentMetadata {
+                path:       None,
+                encoding:   None,
+                version:    None,
+                standalone: None,
             },
+            memory_budget: None,
         }
     }
 
@@ -390,24 +385,15 @@ mod tests {
 
     #[test]
     fn test_get_basename() {
-        assert_eq!(
-            PrefixIdsPlugin::get_basename("/path/to/file.svg"),
-            "file.svg"
-        );
-        assert_eq!(
-            PrefixIdsPlugin::get_basename("C:\\path\\to\\file.svg"),
-            "file.svg"
-        );
+        assert_eq!(PrefixIdsPlugin::get_basename("/path/to/file.svg"), "file.svg");
+        assert_eq!(PrefixIdsPlugin::get_basename("C:\\path\\to\\file.svg"), "file.svg");
         assert_eq!(PrefixIdsPlugin::get_basename("file.svg"), "file.svg");
         assert_eq!(PrefixIdsPlugin::get_basename(""), "");
     }
 
     #[test]
     fn test_escape_identifier_name() {
-        assert_eq!(
-            PrefixIdsPlugin::escape_identifier_name("my file.svg"),
-            "my_file_svg"
-        );
+        assert_eq!(PrefixIdsPlugin::escape_identifier_name("my file.svg"), "my_file_svg");
         assert_eq!(PrefixIdsPlugin::escape_identifier_name("normal"), "normal");
     }
 
@@ -415,9 +401,9 @@ mod tests {
     fn test_generate_prefix() {
         // Test with custom prefix
         let config = PrefixIdsConfig {
-            prefix: Some("custom".to_string()),
-            delim: "__".to_string(),
-            prefix_ids: true,
+            prefix:             Some("custom".to_string()),
+            delim:              "__".to_string(),
+            prefix_ids:         true,
             prefix_class_names: true,
         };
         let plugin = PrefixIdsPlugin::with_config(config);
@@ -452,10 +438,7 @@ mod tests {
         let plugin = PrefixIdsPlugin::new();
 
         // Test valid reference
-        assert_eq!(
-            plugin.prefix_reference("test__", "#myid"),
-            Some("#test__myid".to_string())
-        );
+        assert_eq!(plugin.prefix_reference("test__", "#myid"), Some("#test__myid".to_string()));
 
         // Test invalid reference
         assert_eq!(plugin.prefix_reference("test__", "myid"), None);
@@ -468,10 +451,10 @@ mod tests {
 
         // Add element with ID
         let mut rect = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         rect.set_attr("id", "myId");
         doc.root.children.push(Node::Element(rect));
@@ -494,10 +477,10 @@ mod tests {
 
         // Add element with href
         let mut use_elem = Element {
-            name: "use".into(),
+            name:       "use".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         use_elem.set_attr("href", "#myTarget");
         doc.root.children.push(Node::Element(use_elem));
@@ -516,9 +499,9 @@ mod tests {
     #[test]
     fn test_apply_with_custom_config() {
         let config = PrefixIdsConfig {
-            prefix: Some("custom".to_string()),
-            delim: "_".to_string(),
-            prefix_ids: true,
+            prefix:             Some("custom".to_string()),
+            delim:              "_".to_string(),
+            prefix_ids:         true,
             prefix_class_names: true,
         };
         let plugin = PrefixIdsPlugin::with_config(config);
@@ -526,10 +509,10 @@ mod tests {
 
         // Add element with ID
         let mut rect = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         rect.set_attr("id", "myId");
         doc.root.children.push(Node::Element(rect));
@@ -550,38 +533,23 @@ mod tests {
         let plugin = PrefixIdsPlugin::new();
 
         // Test double-quoted URL
-        assert_eq!(
-            plugin.process_url_references("url(\"#icon\")", "pre_"),
-            "url(\"#pre_icon\")"
-        );
+        assert_eq!(plugin.process_url_references("url(\"#icon\")", "pre_"), "url(\"#pre_icon\")");
 
         // Test single-quoted URL
-        assert_eq!(
-            plugin.process_url_references(r#"url('#icon')"#, "pre_"),
-            r#"url('#pre_icon')"#
-        );
+        assert_eq!(plugin.process_url_references(r#"url('#icon')"#, "pre_"), r#"url('#pre_icon')"#);
 
         // Test unquoted URL
-        assert_eq!(
-            plugin.process_url_references("url(#icon)", "pre_"),
-            "url(#pre_icon)"
-        );
+        assert_eq!(plugin.process_url_references("url(#icon)", "pre_"), "url(#pre_icon)");
 
         // Test non-reference URL
-        assert_eq!(
-            plugin.process_url_references("url(http://example.com)", "pre_"),
-            "url(http://example.com)"
-        );
+        assert_eq!(plugin.process_url_references("url(http://example.com)", "pre_"), "url(http://example.com)");
     }
 
     #[test]
     fn test_process_animation_references() {
         let plugin = PrefixIdsPlugin::new();
 
-        assert_eq!(
-            plugin.process_animation_references("elem1.end", "pre_"),
-            "pre_elem1.end"
-        );
+        assert_eq!(plugin.process_animation_references("elem1.end", "pre_"), "pre_elem1.end");
 
         assert_eq!(
             plugin.process_animation_references("elem1.start; elem2.end", "pre_"),

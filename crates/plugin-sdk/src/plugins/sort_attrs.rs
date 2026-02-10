@@ -208,6 +208,11 @@ impl Plugin for SortAttrsPlugin {
         Ok(())
     }
 
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
+        Ok(())
+    }
+
     fn apply(&self, document: &mut Document) -> Result<()> {
         self.sort_attrs_recursive(&mut document.root);
         Ok(())
@@ -473,4 +478,4 @@ mod unit_tests {
 }
 
 // Use parameterized testing framework for SVGO fixture tests
-crate::plugin_fixture_tests!(SortAttrsPlugin, "sortAttrs");
+crate::plugin_fixture_tests_with_params!(SortAttrsPlugin, "sortAttrs");

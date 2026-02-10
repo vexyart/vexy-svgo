@@ -68,6 +68,7 @@ pub fn create_migrated_plugin_registry() -> PluginRegistry {
     registry.register("prefixIds", || PrefixIdsPlugin::new());
     registry.register("reusePaths", || ReusePathsPlugin::new());
     registry.register("removeAttributesBySelector", || RemoveAttributesBySelectorPlugin::new());
+    registry.register("usvg", || UsvgPlugin::new());
 
     registry
 }
@@ -311,7 +312,7 @@ pub fn get_default_plugin_configs() -> Vec<vexy_svgo_core::parser::config::Plugi
             }),
         },
         PluginConfig::WithParams {
-            name: "removeXmlns".to_string(),
+            name: "removeXMLNS".to_string(),
             params: json!({"enabled": false}),
         },
         PluginConfig::WithParams {
@@ -380,7 +381,7 @@ pub fn get_migrated_plugin_names() -> Vec<&'static str> {
         "removeUselessTransforms",
         "removeUselessStrokeAndFill",
         "removeXlink",
-        "removeXmlns",
+        "removeXMLNS",
         "prefixIds",
         "reusePaths",
         "removeAttributesBySelector",

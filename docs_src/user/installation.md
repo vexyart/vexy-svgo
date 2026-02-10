@@ -246,7 +246,7 @@ cargo clean
 cargo build --release
 
 # Check system requirements
-rustc --version  # Should be 1.70 or newer
+rustc --version  # Should be 1.74 or newer
 ```
 
 ---
@@ -269,6 +269,6 @@ Once installed, continue to:
 - **OS**: macOS 10.12+, Windows 10+, Linux (glibc 2.17+)
 
 For building from source:
-- **Rust**: 1.70 or newer
+- **Rust**: 1.74 or newer
 - **Memory**: 1GB RAM for compilation
 - **Storage**: 500MB for build dependencies

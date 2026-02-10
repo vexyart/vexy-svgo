@@ -1,38 +1,48 @@
 // this_file: crates/core/src/parser/streaming.rs
 
-use crate::ast::{Document, Element, Node};
-use crate::parser::config::StreamingConfig;
-use crate::parser::entities::{expand_entities_in_text, parse_entities_from_doctype};
-use crate::error::VexyError;
-use crate::parser::util::TEXT_ELEMENTS;
-use quick_xml::events::Event;
-use quick_xml::Reader;
 use std::collections::HashMap;
 use std::io::BufRead;
 
+use quick_xml::events::Event;
+use quick_xml::Reader;
+
+use crate::ast::{Document, Element, Node};
+use crate::error::VexyError;
+use crate::parser::config::StreamingConfig;
+use crate::parser::entities::{expand_entities_in_text, parse_entities_from_doctype};
+use crate::parser::util::text_elements;
+
 /// Streaming parser for large SVG documents
 pub struct StreamingParser<R: BufRead> {
-    reader: Reader<R>,
-    config: StreamingConfig,
-    preserve_whitespace: bool,
-    preserve_comments: bool,
-    expand_entities: bool,
+    reader:               Reader<R>,
+    config:               StreamingConfig,
+    preserve_whitespace:  bool,
+    preserve_comments:    bool,
+    expand_entities:      bool,
     #[allow(dead_code)]
-    file_path: Option<String>,
-    current_depth: usize,
-    bytes_processed: usize,
+    file_path:            Option<String>,
+    current_depth:        usize,
+    bytes_processed:      usize,
+    current_memory_usage: usize,
 }
 
 impl<R: BufRead> StreamingParser<R> {
-    pub fn new(reader: R, config: StreamingConfig, preserve_whitespace: bool, preserve_comments: bool, expand_entities: bool, file_path: Option<String>) -> Self {
+    pub fn new(
+        reader: R,
+        config: StreamingConfig,
+        preserve_whitespace: bool,
+        preserve_comments: bool,
+        expand_entities: bool,
+        file_path: Option<String>,
+    ) -> Self {
         let xml_reader = Reader::from_reader(reader);
-        
+
         // Configure reader for quick-xml 0.31
         // Note: In quick-xml 0.31, configuration is done differently
         // The trim settings are controlled by the parser, not the reader
         // expand_empty_elements is handled automatically
         // check_end_names is enabled by default
-        
+
         Self {
             reader: xml_reader,
             config,
@@ -42,7 +52,22 @@ impl<R: BufRead> StreamingParser<R> {
             file_path,
             current_depth: 0,
             bytes_processed: 0,
+            current_memory_usage: 0,
         }
+    }
+
+    /// Track memory usage and return error if limit exceeded
+    fn track_memory(&mut self, size: usize) -> Result<(), VexyError> {
+        if let Some(limit) = self.config.memory_limit {
+            self.current_memory_usage = self.current_memory_usage.saturating_add(size);
+            if self.current_memory_usage > limit {
+                return Err(VexyError::Parse(crate::parser::error::ParseError::StructureError(format!(
+                    "Memory limit exceeded: {} bytes (limit: {})",
+                    self.current_memory_usage, limit
+                ))));
+            }
+        }
+        Ok(())
     }
 
     /// Parse the document with streaming optimizations
@@ -60,9 +85,10 @@ impl<R: BufRead> StreamingParser<R> {
 
             // Check depth limit to prevent stack overflow
             if self.current_depth > self.config.max_depth {
-                return Err(VexyError::Parse(crate::parser::error::ParseError::StructureError(
-                    format!("Maximum parsing depth exceeded: {}", self.config.max_depth),
-                )));
+                return Err(VexyError::Parse(crate::parser::error::ParseError::StructureError(format!(
+                    "Maximum parsing depth exceeded: {}",
+                    self.config.max_depth
+                ))));
             }
 
             match self.reader.read_event_into(&mut buf) {
@@ -79,7 +105,7 @@ impl<R: BufRead> StreamingParser<R> {
                         }
                         current_element = Some(element);
                     }
-                }
+                },
                 Ok(Event::End(_)) => {
                     self.current_depth = self.current_depth.saturating_sub(1);
                     element_name_stack.pop();
@@ -93,7 +119,7 @@ impl<R: BufRead> StreamingParser<R> {
                             found_root = true;
                         }
                     }
-                }
+                },
                 Ok(Event::Empty(ref e)) => {
                     let element = self.parse_start_element(e, &entities)?;
 
@@ -103,7 +129,7 @@ impl<R: BufRead> StreamingParser<R> {
                         document.root = element;
                         found_root = true;
                     }
-                }
+                },
                 Ok(Event::Text(ref e)) => {
                     let text_str = match std::str::from_utf8(e.as_ref()) {
                         Ok(s) => s,
@@ -120,14 +146,13 @@ impl<R: BufRead> StreamingParser<R> {
                                     &text_str[..threshold.min(100)],
                                     text_str.len() - threshold.min(100),
                                 );
-                                element.add_child(Node::Text(truncated));
+                                element.add_child(Node::Text(truncated.into()));
                             }
                             continue;
                         }
                     }
 
-                    let text = quick_xml::escape::unescape(text_str)
-                        .unwrap_or(std::borrow::Cow::Borrowed(text_str));
+                    let text = quick_xml::escape::unescape(text_str).unwrap_or(std::borrow::Cow::Borrowed(text_str));
                     let mut text_content = text.into_owned();
 
                     if self.expand_entities && !entities.is_empty() {
@@ -137,15 +162,17 @@ impl<R: BufRead> StreamingParser<R> {
                     let should_preserve_whitespace = self.preserve_whitespace
                         || element_name_stack
                             .last()
-                            .map(|name| TEXT_ELEMENTS.contains(name.as_str()))
+                            .map(|name| text_elements().contains(name.as_str()))
                             .unwrap_or(false);
 
                     if should_preserve_whitespace || !text_content.trim().is_empty() {
                         if let Some(ref mut element) = current_element {
-                            element.add_child(Node::Text(text_content));
+                            // Track memory for text node
+                            self.track_memory(text_content.len() + std::mem::size_of::<Node>())?;
+                            element.add_child(Node::Text(text_content.into()));
                         }
                     }
-                }
+                },
                 Ok(Event::Comment(ref e)) => {
                     if self.preserve_comments {
                         let comment = match std::str::from_utf8(e.as_ref()) {
@@ -153,25 +180,30 @@ impl<R: BufRead> StreamingParser<R> {
                             Err(_) => continue, // Skip invalid UTF-8
                         };
 
+                        let comment_size = comment.len() + std::mem::size_of::<Node>();
+                        self.track_memory(comment_size)?;
+
                         if let Some(ref mut element) = current_element {
-                            element.add_child(Node::Comment(comment));
+                            element.add_child(Node::Comment(comment.into()));
                         } else if !found_root {
-                            document.prologue.push(Node::Comment(comment));
+                            document.prologue.push(Node::Comment(comment.into()));
                         } else {
-                            document.epilogue.push(Node::Comment(comment));
+                            document.epilogue.push(Node::Comment(comment.into()));
                         }
                     }
-                }
+                },
                 Ok(Event::CData(ref e)) => {
                     let cdata = match std::str::from_utf8(e.as_ref()) {
                         Ok(s) => s.to_string(),
                         Err(_) => continue, // Skip invalid UTF-8
                     };
 
+                    self.track_memory(cdata.len() + std::mem::size_of::<Node>())?;
+
                     if let Some(ref mut element) = current_element {
-                        element.add_child(Node::CData(cdata));
+                        element.add_child(Node::CData(cdata.into()));
                     }
-                }
+                },
                 Ok(Event::PI(ref e)) => {
                     let pi_data = match std::str::from_utf8(e.as_ref()) {
                         Ok(s) => s,
@@ -182,7 +214,12 @@ impl<R: BufRead> StreamingParser<R> {
                     let target = parts[0].to_string();
                     let data = parts.get(1).unwrap_or(&"").to_string();
 
-                    let pi_node = Node::ProcessingInstruction { target, data };
+                    self.track_memory(target.len() + data.len() + std::mem::size_of::<Node>())?;
+
+                    let pi_node = Node::ProcessingInstruction {
+                        target: target.into(),
+                        data:   data.into(),
+                    };
 
                     if let Some(ref mut element) = current_element {
                         element.add_child(pi_node);
@@ -191,17 +228,15 @@ impl<R: BufRead> StreamingParser<R> {
                     } else {
                         document.epilogue.push(pi_node);
                     }
-                }
+                },
                 Ok(Event::Decl(ref e)) => {
                     if let Ok(version) = e.version() {
-                        document.metadata.version =
-                            Some(String::from_utf8_lossy(&version).to_string());
+                        document.metadata.version = Some(String::from_utf8_lossy(&version).into());
                     }
                     if let Some(Ok(enc)) = e.encoding() {
-                        document.metadata.encoding =
-                            Some(String::from_utf8_lossy(&enc).to_string());
+                        document.metadata.encoding = Some(String::from_utf8_lossy(&enc).into());
                     }
-                }
+                },
                 Ok(Event::DocType(ref e)) => {
                     let doctype = match std::str::from_utf8(e.as_ref()) {
                         Ok(s) => s.to_string(),
@@ -213,9 +248,10 @@ impl<R: BufRead> StreamingParser<R> {
                     }
 
                     if !found_root {
-                        document.prologue.push(Node::DocType(doctype));
+                        self.track_memory(doctype.len() + std::mem::size_of::<Node>())?;
+                        document.prologue.push(Node::DocType(doctype.into()));
                     }
-                }
+                },
                 Ok(Event::Eof) => break,
                 // GeneralRef events are ignored in streaming mode
                 // Ok(Event::GeneralRef(_)) => {
@@ -225,10 +261,10 @@ impl<R: BufRead> StreamingParser<R> {
                     // In streaming mode, we're more tolerant of errors
                     // but still track position for debugging
                     let byte_pos = self.reader.buffer_position();
-                    return Err(VexyError::Parse(crate::parser::error::ParseError::StructureError(
-                        format!("Streaming parse error at byte {byte_pos}: {e}"),
-                    )));
-                }
+                    return Err(VexyError::Parse(crate::parser::error::ParseError::StructureError(format!(
+                        "Streaming parse error at byte {byte_pos}: {e}"
+                    ))));
+                },
             }
 
             // Track bytes processed for progress reporting
@@ -261,7 +297,7 @@ impl<R: BufRead> StreamingParser<R> {
 
     // Helper methods from the main parser
     fn parse_start_element(
-        &self,
+        &mut self,
         start: &quick_xml::events::BytesStart<'_>,
         entities: &HashMap<String, String>,
     ) -> Result<Element<'static>, VexyError> {
@@ -270,42 +306,73 @@ impl<R: BufRead> StreamingParser<R> {
             Err(_) => "unknown".to_string(), // More tolerant in streaming mode
         };
 
+        // Track memory for element structure and name
+        self.track_memory(std::mem::size_of::<Element>() + name.len())?;
+
         let mut element = if self.config.lazy_loading {
             Element::new(std::borrow::Cow::Owned(name))
         } else {
             // Pre-allocate capacity based on typical SVG element patterns
             let expected_children = match name.as_str() {
-                "svg" | "g" | "defs" => 10,     // Container elements
+                "svg" | "g" | "defs" => 10,      // Container elements
                 "path" | "rect" | "circle" => 0, // Leaf elements
                 _ => 2,                          // Default
             };
             Element::with_capacity(std::borrow::Cow::Owned(name), expected_children)
         };
 
-        // Parse attributes with error tolerance
-        for attr in start.attributes().flatten() {
-            if let (Ok(key), Ok(value)) = (
-                std::str::from_utf8(attr.key.as_ref()),
-                attr.unescape_value(),
-            ) {
-                let mut attr_value = value.to_string();
+        // Parse attributes with error tolerance and zero-copy optimizations
+        for attr_result in start.attributes() {
+            match attr_result {
+                Ok(attr) => {
+                    // 1. Zero-copy key parsing
+                    let key_str = match std::str::from_utf8(attr.key.as_ref()) {
+                        Ok(k) => k,
+                        Err(_) => continue, // Skip invalid UTF-8 keys
+                    };
 
-                if self.expand_entities && !entities.is_empty() {
-                    attr_value = expand_entities_in_text(&attr_value, entities);
-                }
+                    // 2. Zero-copy value parsing (borrowed if no entities)
+                    // unescape_value returns Cow<'a, str>, avoiding allocation if possible
+                    match attr.unescape_value() {
+                        Ok(value) => {
+                            let mut final_value = value;
 
-                // Handle namespaces
-                if key.starts_with("xmlns") {
-                    if key == "xmlns" {
-                        element.namespaces.insert("".to_string(), attr_value.clone());
-                    } else if let Some(ns_name) = key.strip_prefix("xmlns:") {
-                        element.namespaces.insert(ns_name.to_string(), attr_value.clone());
+                            // 3. Handle custom entities if needed
+                            if self.expand_entities && !entities.is_empty() {
+                                // Only allocate if we actually perform expansion
+                                // Check if value contains '&' to avoid unnecessary processing
+                                if final_value.contains('&') {
+                                    let expanded = expand_entities_in_text(&final_value, entities);
+                                    if expanded != final_value {
+                                        final_value = std::borrow::Cow::Owned(expanded);
+                                    }
+                                }
+                            }
+
+                            // 4. Insert into Element
+                            // Since Document is 'static, we must own the data eventually,
+                            // but we avoid intermediate String allocations.
+                            // We use into_owned() to consume the Cow directly.
+                            let value_owned = final_value.into_owned();
+
+                            // Track memory for attribute (approximate overhead)
+                            // Key string + Value string + entry overhead
+                            self.track_memory(key_str.len() + value_owned.len() + 64)?;
+
+                            // Track namespaces for namespace-aware logic
+                            if key_str == "xmlns" {
+                                element.namespaces.insert("".into(), value_owned.clone().into());
+                            } else if let Some(ns_name) = key_str.strip_prefix("xmlns:") {
+                                element.namespaces.insert(ns_name.into(), value_owned.clone().into());
+                            }
+
+                            element.set_attr(key_str.to_string(), value_owned);
+                        },
+                        Err(_) => continue, // Skip invalid attribute values
                     }
-                } else {
-                    element.set_attr(key.to_string(), attr_value);
-                }
+                },
+                Err(_) => continue, // Skip malformed attributes
             }
-            // Continue on attribute parsing errors in streaming mode
         }
 
         Ok(element)

@@ -6,12 +6,13 @@
 //! and collapsing multiple spaces into single spaces. This follows the same pattern
 //! as svgo's cleanupAttrs plugin.
 
-use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use vexy_svgo_core::ast::{Document, Element};
-use vexy_svgo_core::visitor::Visitor;
+use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::error::VexyError;
+use vexy_svgo_core::visitor::Visitor;
+
+use crate::Plugin;
 
 /// Parameters for the cleanup attrs plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,17 +21,17 @@ pub struct CleanupAttrsParams {
     /// Remove newlines from attribute values
     pub newlines: bool,
     /// Trim leading and trailing whitespace from attribute values
-    pub trim: bool,
+    pub trim:     bool,
     /// Collapse multiple spaces into single space
-    pub spaces: bool,
+    pub spaces:   bool,
 }
 
 impl Default for CleanupAttrsParams {
     fn default() -> Self {
         Self {
             newlines: true,
-            trim: true,
-            spaces: true,
+            trim:     true,
+            spaces:   true,
         }
     }
 }
@@ -52,6 +53,42 @@ impl CleanupAttrsPlugin {
     /// Create plugin with specific parameters
     pub fn with_params(params: CleanupAttrsParams) -> Self {
         Self { params }
+    }
+
+    fn is_formatting_whitespace(text: &str) -> bool {
+        text.trim().is_empty() && text.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    }
+
+    fn cleanup_formatting_whitespace(nodes: &mut Vec<Node>) {
+        let has_non_whitespace_content = nodes.iter().any(|node| match node {
+            Node::Element(_) => true,
+            Node::Text(text) => !text.trim().is_empty(),
+            _ => false,
+        });
+
+        if has_non_whitespace_content {
+            nodes.retain(|node| !matches!(node, Node::Text(text) if Self::is_formatting_whitespace(text)));
+        }
+    }
+
+    fn cleanup_formatting_whitespace_recursive(element: &mut Element<'_>) {
+        let preserve = matches!(element.name.as_ref(), "text" | "tspan" | "tref" | "textPath" | "altGlyph");
+        for child in &mut element.children {
+            if let Node::Text(text) = child {
+                if !preserve && (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        *text = trimmed.to_string().into();
+                    }
+                }
+            }
+        }
+        Self::cleanup_formatting_whitespace(&mut element.children);
+        for child in &mut element.children {
+            if let Node::Element(child_element) = child {
+                Self::cleanup_formatting_whitespace_recursive(child_element);
+            }
+        }
     }
 }
 
@@ -81,6 +118,7 @@ impl Plugin for CleanupAttrsPlugin {
 
         let mut visitor = CleanupAttrsVisitor::new(params);
         vexy_svgo_core::visitor::walk_document(&mut visitor, document)?;
+        Self::cleanup_formatting_whitespace_recursive(&mut document.root);
         Ok(())
     }
 }
@@ -112,7 +150,7 @@ impl CleanupAttrsVisitor {
         if self.params.spaces {
             let mut cleaned = String::with_capacity(result.len());
             let mut prev_space = false;
-            
+
             for ch in result.chars() {
                 if ch.is_whitespace() {
                     if !prev_space {
@@ -138,15 +176,19 @@ impl CleanupAttrsVisitor {
 
     fn should_cleanup_attribute(&self, name: &str) -> bool {
         // Skip certain attributes that should preserve their exact formatting
-        !matches!(
-            name,
-            "xml:space" | "preserveAspectRatio" | "viewBox" | "points" | "d"
-        )
+        !matches!(name, "xml:space" | "preserveAspectRatio" | "viewBox" | "points" | "d")
     }
 }
 
 impl Visitor<'_> for CleanupAttrsVisitor {
     fn visit_element_enter(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
+        for namespace in element.namespaces.values_mut() {
+            let cleaned = self.clean_attribute_value(namespace);
+            if cleaned != namespace.as_ref() {
+                *namespace = cleaned.into();
+            }
+        }
+
         // Clean up attribute values
         for (name, value) in element.attributes.iter_mut() {
             if self.should_cleanup_attribute(name) && !value.is_empty() {
@@ -163,9 +205,10 @@ impl Visitor<'_> for CleanupAttrsVisitor {
 
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
     use serde_json::json;
     use vexy_svgo_core::ast::{Document, Element};
+
+    use super::*;
 
     #[test]
     fn test_plugin_creation() {
@@ -182,23 +225,13 @@ mod unit_tests {
 
         // Valid parameters
         assert!(plugin.validate_params(&json!({})).is_ok());
-        assert!(plugin
-            .validate_params(&json!({"newlines": true}))
-            .is_ok());
-        assert!(plugin
-            .validate_params(&json!({"trim": false}))
-            .is_ok());
-        assert!(plugin
-            .validate_params(&json!({"spaces": true}))
-            .is_ok());
-        assert!(plugin
-            .validate_params(&json!({"newlines": false, "trim": true, "spaces": false}))
-            .is_ok());
+        assert!(plugin.validate_params(&json!({"newlines": true})).is_ok());
+        assert!(plugin.validate_params(&json!({"trim": false})).is_ok());
+        assert!(plugin.validate_params(&json!({"spaces": true})).is_ok());
+        assert!(plugin.validate_params(&json!({"newlines": false, "trim": true, "spaces": false})).is_ok());
 
         // Invalid parameters
-        assert!(plugin
-            .validate_params(&json!({"newlines": "invalid"}))
-            .is_err());
+        assert!(plugin.validate_params(&json!({"newlines": "invalid"})).is_err());
         assert!(plugin.validate_params(&json!({"trim": 123})).is_err());
     }
 
@@ -208,28 +241,16 @@ mod unit_tests {
         let visitor = CleanupAttrsVisitor::new(params);
 
         // Test newline removal
-        assert_eq!(
-            visitor.clean_attribute_value("value\nwith\nnewlines"),
-            "value with newlines"
-        );
+        assert_eq!(visitor.clean_attribute_value("value\nwith\nnewlines"), "value with newlines");
 
         // Test trimming
-        assert_eq!(
-            visitor.clean_attribute_value("  value  "),
-            "value"
-        );
+        assert_eq!(visitor.clean_attribute_value("  value  "), "value");
 
         // Test space collapsing
-        assert_eq!(
-            visitor.clean_attribute_value("value    with    spaces"),
-            "value with spaces"
-        );
+        assert_eq!(visitor.clean_attribute_value("value    with    spaces"), "value with spaces");
 
         // Test combined
-        assert_eq!(
-            visitor.clean_attribute_value("  value\n  with  \n  all   issues  "),
-            "value with all issues"
-        );
+        assert_eq!(visitor.clean_attribute_value("  value\n  with  \n  all   issues  "), "value with all issues");
 
         // Test empty and whitespace-only
         assert_eq!(visitor.clean_attribute_value(""), "");
@@ -241,38 +262,29 @@ mod unit_tests {
         // Test with only newlines enabled
         let params = CleanupAttrsParams {
             newlines: true,
-            trim: false,
-            spaces: false,
+            trim:     false,
+            spaces:   false,
         };
         let visitor = CleanupAttrsVisitor::new(params);
-        assert_eq!(
-            visitor.clean_attribute_value("  value\nwith\nnewlines  "),
-            "value with newlines"
-        );
+        assert_eq!(visitor.clean_attribute_value("  value\nwith\nnewlines  "), "value with newlines");
 
         // Test with only trim enabled
         let params = CleanupAttrsParams {
             newlines: false,
-            trim: true,
-            spaces: false,
+            trim:     true,
+            spaces:   false,
         };
         let visitor = CleanupAttrsVisitor::new(params);
-        assert_eq!(
-            visitor.clean_attribute_value("  value  "),
-            "value"
-        );
+        assert_eq!(visitor.clean_attribute_value("  value  "), "value");
 
         // Test with only spaces enabled
         let params = CleanupAttrsParams {
             newlines: false,
-            trim: false,
-            spaces: true,
+            trim:     false,
+            spaces:   true,
         };
         let visitor = CleanupAttrsVisitor::new(params);
-        assert_eq!(
-            visitor.clean_attribute_value("value    with    spaces"),
-            "value with spaces"
-        );
+        assert_eq!(visitor.clean_attribute_value("value    with    spaces"), "value with spaces");
     }
 
     #[test]

@@ -28,35 +28,31 @@ pub trait Visitor<'a> {
     }
 
     /// Called when visiting text content
-    fn visit_text(&mut self, text: &mut String) -> Result<(), VexyError> {
+    fn visit_text(&mut self, text: &str) -> Result<(), VexyError> {
         let _ = text;
         Ok(())
     }
 
     /// Called when visiting a comment
-    fn visit_comment(&mut self, comment: &mut String) -> Result<(), VexyError> {
+    fn visit_comment(&mut self, comment: &str) -> Result<(), VexyError> {
         let _ = comment;
         Ok(())
     }
 
     /// Called when visiting a processing instruction
-    fn visit_processing_instruction(
-        &mut self,
-        target: &mut String,
-        data: &mut String,
-    ) -> Result<(), VexyError> {
+    fn visit_processing_instruction(&mut self, target: &str, data: &str) -> Result<(), VexyError> {
         let _ = (target, data);
         Ok(())
     }
 
     /// Called when visiting CDATA
-    fn visit_cdata(&mut self, cdata: &mut String) -> Result<(), VexyError> {
+    fn visit_cdata(&mut self, cdata: &str) -> Result<(), VexyError> {
         let _ = cdata;
         Ok(())
     }
 
     /// Called when visiting DOCTYPE
-    fn visit_doctype(&mut self, doctype: &mut String) -> Result<(), VexyError> {
+    fn visit_doctype(&mut self, doctype: &str) -> Result<(), VexyError> {
         let _ = doctype;
         Ok(())
     }
@@ -92,10 +88,7 @@ pub fn walk_document<'a, V: Visitor<'a> + ?Sized>(
 }
 
 /// Walk through an element and call visitor methods
-pub fn walk_element<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    element: &mut Element<'a>,
-) -> Result<(), VexyError> {
+pub fn walk_element<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, element: &mut Element<'a>) -> Result<(), VexyError> {
     // Enter element
     visitor.visit_element_enter(element)?;
 
@@ -117,9 +110,7 @@ pub fn walk_node<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, node: &mut Node<'
         Node::Element(element) => walk_element(visitor, element),
         Node::Text(text) => visitor.visit_text(text),
         Node::Comment(comment) => visitor.visit_comment(comment),
-        Node::ProcessingInstruction { target, data } => {
-            visitor.visit_processing_instruction(target, data)
-        }
+        Node::ProcessingInstruction { target, data } => visitor.visit_processing_instruction(target, data),
         Node::CData(cdata) => visitor.visit_cdata(cdata),
         Node::DocType(doctype) => visitor.visit_doctype(doctype),
     }
@@ -153,9 +144,7 @@ impl TagNameFilter {
 
 impl ElementFilter for TagNameFilter {
     fn should_visit<'a>(&self, element: &Element<'a>) -> bool {
-        self.tag_names
-            .iter()
-            .any(|name| element.name == name.as_str())
+        self.tag_names.iter().any(|name| element.name == name.as_str())
     }
 }
 
@@ -197,7 +186,7 @@ impl ElementFilter for AttributeFilter {
 /// Filtered visitor that only visits elements matching a filter
 pub struct FilteredVisitor<V, F: ElementFilter> {
     visitor: V,
-    filter: F,
+    filter:  F,
 }
 
 impl<V, F: ElementFilter> FilteredVisitor<V, F> {
@@ -223,27 +212,23 @@ impl<'a, V: Visitor<'a>, F: ElementFilter> Visitor<'a> for FilteredVisitor<V, F>
         }
     }
 
-    fn visit_text(&mut self, text: &mut String) -> Result<(), VexyError> {
+    fn visit_text(&mut self, text: &str) -> Result<(), VexyError> {
         self.visitor.visit_text(text)
     }
 
-    fn visit_comment(&mut self, comment: &mut String) -> Result<(), VexyError> {
+    fn visit_comment(&mut self, comment: &str) -> Result<(), VexyError> {
         self.visitor.visit_comment(comment)
     }
 
-    fn visit_processing_instruction(
-        &mut self,
-        target: &mut String,
-        data: &mut String,
-    ) -> Result<(), VexyError> {
+    fn visit_processing_instruction(&mut self, target: &str, data: &str) -> Result<(), VexyError> {
         self.visitor.visit_processing_instruction(target, data)
     }
 
-    fn visit_cdata(&mut self, cdata: &mut String) -> Result<(), VexyError> {
+    fn visit_cdata(&mut self, cdata: &str) -> Result<(), VexyError> {
         self.visitor.visit_cdata(cdata)
     }
 
-    fn visit_doctype(&mut self, doctype: &mut String) -> Result<(), VexyError> {
+    fn visit_doctype(&mut self, doctype: &str) -> Result<(), VexyError> {
         self.visitor.visit_doctype(doctype)
     }
 }
@@ -255,14 +240,14 @@ mod tests {
 
     struct TestVisitor {
         elements_visited: Vec<String>,
-        texts_visited: Vec<String>,
+        texts_visited:    Vec<String>,
     }
 
     impl TestVisitor {
         fn new() -> Self {
             Self {
                 elements_visited: Vec::new(),
-                texts_visited: Vec::new(),
+                texts_visited:    Vec::new(),
             }
         }
     }
@@ -273,8 +258,8 @@ mod tests {
             Ok(())
         }
 
-        fn visit_text(&mut self, text: &mut String) -> Result<(), VexyError> {
-            self.texts_visited.push(text.clone());
+        fn visit_text(&mut self, text: &str) -> Result<(), VexyError> {
+            self.texts_visited.push(text.to_string());
             Ok(())
         }
     }
@@ -285,10 +270,10 @@ mod tests {
 
         // Create a simple test structure
         let mut rect = Element::new("rect");
-        rect.children.push(Node::Text("Hello".to_string()));
+        rect.children.push(Node::Text("Hello".into()));
 
         document.root.children.push(Node::Element(rect));
-        document.root.children.push(Node::Text("World".to_string()));
+        document.root.children.push(Node::Text("World".into()));
 
         let mut visitor = TestVisitor::new();
         visitor.visit_document(&mut document).unwrap();

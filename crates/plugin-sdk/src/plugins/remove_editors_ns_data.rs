@@ -9,15 +9,17 @@
 //! SVGO parameters supported:
 //! - `additionalNamespaces` (default: []) - Additional namespace URIs to remove
 
-use crate::Plugin;
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
-use std::sync::LazyLock;
 use vexy_svgo_core::ast::{Document, Element, Node};
-use vexy_svgo_core::visitor::Visitor;
 use vexy_svgo_core::error::VexyError;
+use vexy_svgo_core::visitor::Visitor;
+
+use crate::Plugin;
 
 /// Default editor namespaces to remove
 static EDITOR_NAMESPACES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -77,7 +79,7 @@ impl RemoveEditorsNSDataPlugin {
     pub fn new() -> Self {
         Self {
             #[allow(dead_code)]
-            config: RemoveEditorsNSDataConfig::default(),
+            config:                     RemoveEditorsNSDataConfig::default(),
         }
     }
 
@@ -89,8 +91,7 @@ impl RemoveEditorsNSDataPlugin {
     /// Parse configuration from JSON
     fn _parse_config(params: &Value) -> Result<RemoveEditorsNSDataConfig> {
         if let Some(_obj) = params.as_object() {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow!("Invalid configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow!("Invalid configuration: {}", e))
         } else {
             Ok(RemoveEditorsNSDataConfig::default())
         }
@@ -124,17 +125,20 @@ impl Plugin for RemoveEditorsNSDataPlugin {
                         if let Some(arr) = value.as_array() {
                             for item in arr {
                                 if !item.is_string() {
-                                    return Err(anyhow!(
-                                        "additionalNamespaces must contain only strings"
-                                    ));
+                                    return Err(anyhow!("additionalNamespaces must contain only strings"));
                                 }
                             }
                         }
-                    }
+                    },
                     _ => return Err(anyhow!("Unknown parameter: {}", key)),
                 }
             }
         }
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::_parse_config(params)?;
         Ok(())
     }
 
@@ -151,7 +155,7 @@ struct NamespaceState {
     /// Namespace URIs to remove
     namespaces_to_remove: HashSet<String>,
     /// Discovered prefixes that map to editor namespaces
-    prefixes_to_remove: HashSet<String>,
+    prefixes_to_remove:   HashSet<String>,
 }
 
 impl NamespaceState {
@@ -179,7 +183,7 @@ impl NamespaceState {
 struct EditorsNSDataRemovalVisitor {
     #[allow(dead_code)]
     config: RemoveEditorsNSDataConfig,
-    state: NamespaceState,
+    state:  NamespaceState,
 }
 
 impl EditorsNSDataRemovalVisitor {
@@ -192,6 +196,7 @@ impl EditorsNSDataRemovalVisitor {
     fn process_namespace_declarations(&mut self, element: &mut Element) {
         if element.name == "svg" {
             let mut attrs_to_remove = Vec::new();
+            let mut namespaces_to_remove = Vec::new();
 
             // Find xmlns declarations that match editor namespaces
             for (name, value) in &element.attributes {
@@ -208,9 +213,20 @@ impl EditorsNSDataRemovalVisitor {
                 }
             }
 
+            // Handle namespace declarations stored in Element::namespaces.
+            for (prefix, uri) in &element.namespaces {
+                if self.state.namespaces_to_remove.contains(uri.as_ref()) {
+                    self.state.prefixes_to_remove.insert(prefix.to_string());
+                    namespaces_to_remove.push(prefix.clone());
+                }
+            }
+
             // Remove the xmlns declarations
             for attr in attrs_to_remove {
                 element.attributes.shift_remove(&attr);
+            }
+            for prefix in namespaces_to_remove {
+                element.namespaces.shift_remove(&prefix);
             }
         }
     }
@@ -271,10 +287,12 @@ impl Visitor<'_> for EditorsNSDataRemovalVisitor {
 
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
-    use serde_json::json;
     use std::borrow::Cow;
+
+    use serde_json::json;
     use vexy_svgo_core::ast::{Document, Element, Node};
+
+    use super::*;
 
     fn create_element(name: &'static str) -> Element<'static> {
         let mut element = Element::new(name);
@@ -301,15 +319,9 @@ mod unit_tests {
             .is_ok());
 
         // Invalid parameters
-        assert!(plugin
-            .validate_params(&json!({"additionalNamespaces": "invalid"}))
-            .is_err());
-        assert!(plugin
-            .validate_params(&json!({"additionalNamespaces": [123]}))
-            .is_err());
-        assert!(plugin
-            .validate_params(&json!({"unknownParam": true}))
-            .is_err());
+        assert!(plugin.validate_params(&json!({"additionalNamespaces": "invalid"})).is_err());
+        assert!(plugin.validate_params(&json!({"additionalNamespaces": [123]})).is_err());
+        assert!(plugin.validate_params(&json!({"unknownParam": true})).is_err());
     }
 
     #[test]

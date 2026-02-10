@@ -4,9 +4,9 @@
 //!
 //! This module provides a bare-bones API that trades features for size.
 
-use wasm_bindgen::prelude::*;
 #[allow(unused_imports)]
-use vexy_svgo_core::{Config, PluginConfig, optimize_with_config};
+use vexy_svgo_core::{optimize_with_config, Config, PluginConfig};
+use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "size-optimization")]
 #[wasm_bindgen]
@@ -28,11 +28,11 @@ impl MinimalOptimizer {
     /// Returns the optimized SVG or the original on error
     #[wasm_bindgen]
     pub fn optimize(&self, svg: &str) -> String {
-        use vexy_svgo_core::{Config, optimize_with_config};
-        
+        use vexy_svgo_core::{optimize_with_config, Config};
+
         let mut config = Config::default();
         config.multipass = self.multipass;
-        
+
         // Use the most common plugins only
         config.plugins = vec![
             PluginConfig::Name("removeComments".to_string()),
@@ -42,13 +42,13 @@ impl MinimalOptimizer {
             PluginConfig::Name("convertColors".to_string()),
             PluginConfig::Name("removeUselessDefs".to_string()),
         ];
-        
+
         match optimize_with_config(svg, config) {
             Ok(result) => result.data,
             Err(_) => svg.to_string(), // Return original on error
         }
     }
-    
+
     /// Get the compression ratio for the last optimization
     #[wasm_bindgen]
     pub fn compress_ratio(&self, original: &str, optimized: &str) -> f32 {
@@ -64,15 +64,15 @@ impl MinimalOptimizer {
 #[cfg(feature = "size-optimization")]
 #[wasm_bindgen]
 pub fn optimize_minimal(svg: &str) -> String {
-    use vexy_svgo_core::{Config, PluginConfig, optimize_with_config};
-    
+    use vexy_svgo_core::{optimize_with_config, Config, PluginConfig};
+
     // Use only the most impactful plugins
     let mut config = Config::default();
     config.plugins = vec![
         PluginConfig::Name("removeComments".to_string()),
         PluginConfig::Name("collapseGroups".to_string()),
     ];
-    
+
     match optimize_with_config(svg, config) {
         Ok(result) => result.data,
         Err(_) => svg.to_string(),

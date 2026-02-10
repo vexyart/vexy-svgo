@@ -8,25 +8,22 @@
 //! Features streaming parsing optimizations for large documents,
 //! efficient buffer management, and memory-conscious parsing strategies.
 
-
+use std::io::{BufRead, BufReader};
 
 use crate::ast::Document;
-use std::io::{BufRead, BufReader};
-use crate::parser::config::StreamingConfig;
 use crate::error::VexyError;
+use crate::parser::config::StreamingConfig;
 use crate::parser::streaming::StreamingParser;
-
-
 
 /// SVG parser with streaming optimizations
 pub struct Parser {
     /// Whether to preserve whitespace
     preserve_whitespace: bool,
     /// Whether to preserve comments
-    preserve_comments: bool,
+    preserve_comments:   bool,
     /// Whether to expand XML entities
-    expand_entities: bool,
-    
+    expand_entities:     bool,
+
     /// Streaming configuration
     streaming_config: StreamingConfig,
 }
@@ -36,9 +33,9 @@ impl Parser {
     pub fn new() -> Self {
         Self {
             preserve_whitespace: false,
-            preserve_comments: true,
-            expand_entities: true,
-            streaming_config: StreamingConfig::default(),
+            preserve_comments:   true,
+            expand_entities:     true,
+            streaming_config:    StreamingConfig::default(),
         }
     }
 
@@ -46,9 +43,9 @@ impl Parser {
     pub fn with_streaming_config(config: StreamingConfig) -> Self {
         Self {
             preserve_whitespace: false,
-            preserve_comments: true,
-            expand_entities: true,
-            streaming_config: config,
+            preserve_comments:   true,
+            expand_entities:     true,
+            streaming_config:    config,
         }
     }
 
@@ -69,8 +66,6 @@ impl Parser {
         self.expand_entities = expand;
         self
     }
-
-    
 
     /// Set streaming configuration
     pub fn streaming_config(mut self, config: StreamingConfig) -> Self {

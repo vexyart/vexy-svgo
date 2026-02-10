@@ -30,6 +30,10 @@ workspace = true
 [package.rust-version]
 workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 anyhow = { workspace = true }
 log = { workspace = true }
@@ -44,12 +48,14 @@ indexmap = { workspace = true }
 regex = { workspace = true }
 quick-xml = { workspace = true }
 parking_lot = { workspace = true }
-jsonschema = { workspace = true }
+jsonschema = { workspace = true, optional = true }
 base64 = "0.22.1"
 urlencoding = "2.1.3"
+bumpalo = { workspace = true }
 
 [features]
 default = []
+json-schema = ["jsonschema"]
 parallel = ["rayon"]
 lyon = []
 experimental = []

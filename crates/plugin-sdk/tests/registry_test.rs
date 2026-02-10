@@ -209,13 +209,13 @@ fn create_complex_test_document() -> Document<'static> {
     // Add various comments
     doc.root
         .children
-        .push(Node::Comment("Regular comment 1".to_string()));
+        .push(Node::Comment("Regular comment 1".to_string().into_boxed_str()));
     doc.root
         .children
-        .push(Node::Comment("! Legal comment".to_string()));
+        .push(Node::Comment("! Legal comment".to_string().into_boxed_str()));
     doc.root
         .children
-        .push(Node::Comment("Regular comment 2".to_string()));
+        .push(Node::Comment("Regular comment 2".to_string().into_boxed_str()));
 
     // Add nested elements with empty attributes
     let mut group = Element::new("g");
@@ -231,7 +231,7 @@ fn create_complex_test_document() -> Document<'static> {
 
     group
         .children
-        .push(Node::Comment("Nested comment".to_string()));
+        .push(Node::Comment("Nested comment".to_string().into_boxed_str()));
 
     let mut rect = Element::new("rect");
     rect.attributes.insert(Cow::Borrowed("x"), Cow::Borrowed("10"));

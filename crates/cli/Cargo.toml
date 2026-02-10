@@ -31,12 +31,16 @@ workspace = true
 
 
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [[bin]]
 name = "vexy-svgo"
 path = "src/main.rs"
 
 [dependencies]
-vexy-svgo-core = { workspace = true }
+vexy-svgo-core = { workspace = true, features = ["json-schema"] }
 vexy-svgo-plugin-sdk = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }

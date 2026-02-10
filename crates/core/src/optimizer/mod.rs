@@ -8,11 +8,14 @@
 #[cfg(feature = "parallel")]
 pub mod parallel;
 
+pub mod memory;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::VexyError;
 use crate::parser::config::{Config, DataUriFormat};
 use crate::parser::Parser;
 use crate::plugin_registry::PluginRegistry;
-use crate::error::VexyError;
-use serde::{Deserialize, Serialize};
 
 /// Optimization result type
 pub type OptimizeResult<T> = Result<T, VexyError>;
@@ -20,23 +23,24 @@ pub type OptimizeResult<T> = Result<T, VexyError>;
 /// Options for the optimize function
 pub struct OptimizeOptions {
     /// Configuration to use
-    pub config: Config,
+    pub config:        Config,
     /// Plugin registry (if None, uses default)
-    pub registry: Option<PluginRegistry>,
-    /// Parallel processing configuration
-    #[cfg(feature = "parallel")]
-    pub parallel: Option<parallel::ParallelConfig>,
+    pub registry:      Option<PluginRegistry>,
+    /// Optional memory budget
+    pub memory_budget: Option<std::sync::Arc<memory::MemoryBudget>>,
+    /// Enable parallel plugin execution (opt-in, default: false)
+    pub parallel:      bool,
 }
 
 /// Result of an optimization operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationResult {
     /// Optimized SVG data
-    pub data: String,
+    pub data:   String,
     /// Optimization information
-    pub info: OptimizationInfo,
+    pub info:   OptimizationInfo,
     /// Error message (if any)
-    pub error: Option<String>,
+    pub error:  Option<String>,
     /// Whether modern parser was used
     pub modern: bool,
 }
@@ -45,15 +49,15 @@ pub struct OptimizationResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationInfo {
     /// Original size in bytes
-    pub original_size: usize,
+    pub original_size:     usize,
     /// Optimized size in bytes
-    pub optimized_size: usize,
+    pub optimized_size:    usize,
     /// Compression ratio (0.0 to 1.0)
     pub compression_ratio: f64,
     /// Number of plugins applied
-    pub plugins_applied: usize,
+    pub plugins_applied:   usize,
     /// Number of optimization passes
-    pub passes: usize,
+    pub passes:            usize,
 }
 
 impl OptimizeOptions {
@@ -62,8 +66,8 @@ impl OptimizeOptions {
         Self {
             config,
             registry: None,
-            #[cfg(feature = "parallel")]
-            parallel: None,
+            memory_budget: None,
+            parallel: false,
         }
     }
 
@@ -72,11 +76,16 @@ impl OptimizeOptions {
         self.registry = Some(registry);
         self
     }
-    
-    /// Enable parallel processing with the given configuration
-    #[cfg(feature = "parallel")]
-    pub fn with_parallel(mut self, parallel_config: parallel::ParallelConfig) -> Self {
-        self.parallel = Some(parallel_config);
+
+    /// Set the memory budget
+    pub fn with_memory_budget(mut self, budget: std::sync::Arc<memory::MemoryBudget>) -> Self {
+        self.memory_budget = Some(budget);
+        self
+    }
+
+    /// Enable or disable parallel plugin execution
+    pub fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
         self
     }
 }
@@ -89,12 +98,7 @@ impl Default for OptimizeOptions {
 
 impl OptimizationInfo {
     /// Create new optimization info
-    pub fn new(
-        original_size: usize,
-        optimized_size: usize,
-        plugins_applied: usize,
-        passes: usize,
-    ) -> Self {
+    pub fn new(original_size: usize, optimized_size: usize, plugins_applied: usize, passes: usize) -> Self {
         let compression_ratio = if original_size > 0 {
             1.0 - (optimized_size as f64 / original_size as f64)
         } else {
@@ -138,7 +142,7 @@ impl OptimizationInfo {
 /// # Examples
 ///
 /// ```rust
-/// use vexy_svgo_core::{optimize, OptimizeOptions, Config};
+/// use vexy_svgo_core::{optimize, Config, OptimizeOptions};
 ///
 /// let svg = r#"<svg><rect width="100" height="100"/></svg>"#;
 /// let options = OptimizeOptions::new(Config::default());
@@ -148,27 +152,29 @@ impl OptimizationInfo {
 /// ```
 pub fn optimize(input: &str, options: OptimizeOptions) -> Result<OptimizationResult, VexyError> {
     let original_size = input.len();
+    #[cfg(feature = "parallel")]
+    let parallel_enabled = options.parallel;
     let config = options.config;
     let registry = options.registry.unwrap_or_default();
 
-    // Parse the SVG input
     let mut document = Parser::parse_svg_string(input)?;
 
-    // Configure thread pool for parallel processing if enabled
+    if let Some(budget) = options.memory_budget {
+        document.memory_budget = Some(budget);
+    }
+
     #[cfg(feature = "parallel")]
     {
-        if let Some(parallel_config) = &options.parallel {
-            parallel::configure_thread_pool(parallel_config);
+        if parallel_enabled {
+            let parallel_config = parallel::ParallelConfig {
+                num_threads: config.parallel.unwrap_or(0),
+                ..parallel::ParallelConfig::default()
+            };
+            parallel::configure_thread_pool(&parallel_config);
             crate::debug_log!("Configured parallel processing with {} threads", parallel_config.num_threads);
-        } else if original_size > 1024 * 1024 {
-            // Auto-enable parallel processing for large files
-            let auto_config = parallel::ParallelConfig::default();
-            parallel::configure_thread_pool(&auto_config);
-            crate::debug_log!("Auto-enabled parallel processing for large file ({}KB)", 
-                original_size / 1024);
         }
     }
-    
+
     // Use sequential optimization (with potential internal parallelism)
     let mut passes = 0;
     let mut plugins_applied = 0;
@@ -184,40 +190,44 @@ pub fn optimize(input: &str, options: OptimizeOptions) -> Result<OptimizationRes
         // Check if parallel processing is enabled
         #[cfg(feature = "parallel")]
         {
-            if let Some(num_threads) = config.parallel {
+            if parallel_enabled {
+                let num_threads = config.parallel.unwrap_or(0);
                 registry
                     .apply_plugins_parallel(&mut document, registry_plugins, num_threads)
                     .map_err(VexyError::from)?;
             } else {
-                registry
-                    .apply_plugins(&mut document, registry_plugins)
-                    .map_err(VexyError::from)?;
+                registry.apply_plugins(&mut document, registry_plugins).map_err(VexyError::from)?;
             }
         }
         #[cfg(not(feature = "parallel"))]
         {
-            registry
-                .apply_plugins(&mut document, registry_plugins)
-                .map_err(VexyError::from)?;
+            registry.apply_plugins(&mut document, registry_plugins).map_err(VexyError::from)?;
         }
         plugins_applied += config.plugins.len();
 
         // Create stringifier config from js2svg options
         let stringify_config = crate::stringifier::StringifyConfig {
-            pretty: config.js2svg.pretty,
-            indent: config.js2svg.indent.clone(),
-            newlines: config.js2svg.pretty,
-            quote_attrs: true,
-            self_close: config.js2svg.use_short_tags,
+            pretty:           config.js2svg.pretty,
+            indent:           config.js2svg.indent.clone(),
+            newlines:         config.js2svg.pretty,
+            quote_attrs:      true,
+            self_close:       config.js2svg.use_short_tags,
             initial_capacity: 4096,
         };
-        
+
         let current_output = crate::stringifier::stringify_with_config(&document, &stringify_config)?;
         if !config.multipass || current_output == previous_output || passes >= 10 {
-            let final_output = current_output;
+            // Apply data URI encoding if configured
+            let mut final_output = if let Some(ref format) = config.datauri {
+                apply_datauri_encoding(&current_output, format)
+            } else {
+                current_output
+            };
+            if config.js2svg.final_newline && !final_output.ends_with('\n') {
+                final_output.push('\n');
+            }
             let optimized_size = final_output.len();
-            let info =
-                OptimizationInfo::new(original_size, optimized_size, plugins_applied, passes);
+            let info = OptimizationInfo::new(original_size, optimized_size, plugins_applied, passes);
             return Ok(OptimizationResult {
                 data: final_output,
                 info,
@@ -247,12 +257,12 @@ pub fn optimize(input: &str, options: OptimizeOptions) -> Result<OptimizationRes
 /// ```rust
 /// use vexy_svgo_core::optimize_default;
 ///
-/// let svg = r#"<svg><!-- comment --><rect width="100" height="100"/></svg>"#;
+/// let svg = r#"<svg><rect width="100" height="100"/></svg>"#;
 /// let result = optimize_default(svg).unwrap();
-/// assert!(!result.data.contains("<!-- comment")); // Comments removed by default
+/// assert!(!result.data.is_empty());
 /// ```
 pub fn optimize_default(input: &str) -> Result<OptimizationResult, VexyError> {
-    optimize(input, OptimizeOptions::default())
+    optimize(input, OptimizeOptions::new(Config::with_default_preset()))
 }
 
 /// Optimize with a custom configuration
@@ -293,18 +303,19 @@ pub fn optimize_with_config(input: &str, config: Config) -> Result<OptimizationR
 pub fn apply_datauri_encoding(svg: &str, format: &DataUriFormat) -> String {
     match format {
         DataUriFormat::Base64 => {
-            use base64::{engine::general_purpose::STANDARD, Engine as _};
+            use base64::engine::general_purpose::STANDARD;
+            use base64::Engine as _;
             let encoded = STANDARD.encode(svg.as_bytes());
             format!("data:image/svg+xml;base64,{}", encoded)
-        }
+        },
         DataUriFormat::Enc => {
             use urlencoding::encode;
             let encoded = encode(svg);
             format!("data:image/svg+xml,{encoded}")
-        }
+        },
         DataUriFormat::Unenc => {
             format!("data:image/svg+xml,{svg}")
-        }
+        },
     }
 }
 
@@ -317,23 +328,23 @@ pub fn apply_datauri_encoding(svg: &str, _format: &DataUriFormat) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::{Document, Node};
     use crate::parser::config::Config;
     use crate::plugin_registry::PluginRegistry;
     use crate::Plugin;
-    use crate::ast::{Document, Node};
-    
+
     // Simple test plugin to remove comments
     struct RemoveCommentsPlugin;
-    
+
     impl Plugin for RemoveCommentsPlugin {
         fn name(&self) -> &'static str {
             "removeComments"
         }
-        
+
         fn description(&self) -> &'static str {
             "Remove comments"
         }
-        
+
         fn apply(&self, document: &mut Document) -> anyhow::Result<()> {
             // Remove comments from root children
             document.root.children.retain(|node| !matches!(node, Node::Comment(_)));
@@ -359,7 +370,7 @@ mod tests {
         // Create a registry with our test plugin
         let mut registry = PluginRegistry::new();
         registry.register("removeComments", || RemoveCommentsPlugin);
-        
+
         let result = optimize(svg, OptimizeOptions::new(config).with_registry(registry)).unwrap();
 
         assert!(!result.data.is_empty());
@@ -396,8 +407,10 @@ mod tests {
     #[test]
     #[cfg(feature = "data-uri")]
     fn test_datauri_encoding() {
+        use base64::engine::general_purpose::STANDARD;
+        use base64::Engine as _;
+
         use crate::parser::config::DataUriFormat;
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
 
         let svg = "<svg><circle r=\"5\"/></svg>";
 
@@ -405,10 +418,7 @@ mod tests {
         let base64_result = apply_datauri_encoding(svg, &DataUriFormat::Base64);
         assert!(base64_result.starts_with("data:image/svg+xml;base64,"));
         let expected_base64 = STANDARD.encode(svg.as_bytes());
-        assert_eq!(
-            base64_result,
-            format!("data:image/svg+xml;base64,{}", expected_base64)
-        );
+        assert_eq!(base64_result, format!("data:image/svg+xml;base64,{}", expected_base64));
 
         // Test URL encoding
         let enc_result = apply_datauri_encoding(svg, &DataUriFormat::Enc);

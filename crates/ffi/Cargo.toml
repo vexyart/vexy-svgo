@@ -33,13 +33,17 @@ workspace = true
 [package.rust-version]
 workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 serde_json = { workspace = true }
 anyhow = { workspace = true }
-cbindgen = "0.26.0"
+cbindgen = { version = "0.26.0", default-features = false }
 libc = "0.2"
 
 
@@ -48,5 +52,5 @@ path = "../core"
 
 
 [build-dependencies]
-cbindgen = "0.26.0"
+cbindgen = { version = "0.26.0", default-features = false }
 

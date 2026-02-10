@@ -163,7 +163,7 @@ mod unit_tests {
         let mut metadata = create_element("metadata");
         metadata
             .children
-            .push(Node::Text("Some metadata content".to_string()));
+            .push(Node::Text("Some metadata content".to_string().into()));
         doc.root.children.push(Node::Element(metadata));
 
         // Add a regular element
@@ -274,7 +274,7 @@ mod unit_tests {
         // Add metadata, text, and element
         let metadata = create_element("metadata");
         doc.root.children.push(Node::Element(metadata));
-        doc.root.children.push(Node::Text("Some text".to_string()));
+        doc.root.children.push(Node::Text("Some text".to_string().into()));
         let rect = create_element("rect");
         doc.root.children.push(Node::Element(rect));
 
@@ -297,10 +297,10 @@ mod unit_tests {
         let mut metadata = create_element("metadata");
         metadata
             .children
-            .push(Node::Text("Title: Test SVG".to_string()));
+            .push(Node::Text("Title: Test SVG".to_string().into()));
         let mut desc = create_element("desc");
         desc.children
-            .push(Node::Text("Description content".to_string()));
+            .push(Node::Text("Description content".to_string().into()));
         metadata.children.push(Node::Element(desc));
 
         doc.root.children.push(Node::Element(metadata));

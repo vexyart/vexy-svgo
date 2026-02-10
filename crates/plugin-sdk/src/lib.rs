@@ -17,6 +17,7 @@ use vexy_svgo_core::error::VexyError;
 pub mod plugins;
 pub mod registry;
 pub mod enhanced_registry;
+pub mod css_matching;
 
 #[macro_use]
 #[doc(hidden)]

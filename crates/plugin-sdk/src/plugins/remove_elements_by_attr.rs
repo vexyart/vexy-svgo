@@ -7,12 +7,14 @@
 //!
 //! Reference: SVGO's removeElementsByAttr plugin
 
-use crate::Plugin;
+use std::collections::HashSet;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
 use vexy_svgo_core::ast::{Document, Element, Node};
+
+use crate::Plugin;
 
 /// Configuration for the removeElementsByAttr plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +22,7 @@ use vexy_svgo_core::ast::{Document, Element, Node};
 pub struct RemoveElementsByAttrConfig {
     /// IDs of elements to remove
     #[serde(default)]
-    pub id: Vec<String>,
+    pub id:    Vec<String>,
     /// Class names of elements to remove
     #[serde(default)]
     pub class: Vec<String>,
@@ -29,7 +31,7 @@ pub struct RemoveElementsByAttrConfig {
 impl Default for RemoveElementsByAttrConfig {
     fn default() -> Self {
         Self {
-            id: vec![],
+            id:    vec![],
             class: vec![],
         }
     }
@@ -67,8 +69,8 @@ impl RemoveElementsByAttrPlugin {
                                 config.id.push(id_str.clone());
                             }
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
 
@@ -82,15 +84,14 @@ impl RemoveElementsByAttrPlugin {
                                 config.class.push(class_str.clone());
                             }
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
 
             Ok(config)
         } else {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
         }
     }
 
@@ -161,6 +162,11 @@ impl Plugin for RemoveElementsByAttrPlugin {
         Ok(())
     }
 
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
+        Ok(())
+    }
+
     fn apply(&self, document: &mut Document) -> Result<()> {
         // Only proceed if we have something to remove
         if self.config.id.is_empty() && self.config.class.is_empty() {
@@ -174,27 +180,31 @@ impl Plugin for RemoveElementsByAttrPlugin {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use indexmap::IndexMap;
     use serde_json::json;
-    use std::collections::HashMap;
     use vexy_svgo_core::ast::{Document, DocumentMetadata, Element, Node};
+
+    use super::*;
 
     fn create_test_document() -> Document<'static> {
         Document {
-            root: Element {
-                name: "svg".into(),
+            root:          Element {
+                name:       "svg".into(),
                 attributes: IndexMap::new(),
                 namespaces: IndexMap::new(),
-                children: vec![],
+                children:   vec![],
             },
-            prologue: vec![],
-            epilogue: vec![],
-            metadata: DocumentMetadata {
+            prologue:      vec![],
+            epilogue:      vec![],
+            metadata:      DocumentMetadata {
                 path: None,
                 encoding: None,
                 version: None,
+                ..Default::default()
             },
+            memory_budget: None,
         }
     }
 
@@ -202,10 +212,7 @@ mod tests {
     fn test_plugin_info() {
         let plugin = RemoveElementsByAttrPlugin::new();
         assert_eq!(plugin.name(), "removeElementsByAttr");
-        assert_eq!(
-            plugin.description(),
-            "removes arbitrary elements by ID or className (disabled by default)"
-        );
+        assert_eq!(plugin.description(), "removes arbitrary elements by ID or className (disabled by default)");
     }
 
     #[test]
@@ -295,16 +302,16 @@ mod tests {
     #[test]
     fn test_should_remove_element_by_id() {
         let config = RemoveElementsByAttrConfig {
-            id: vec!["removeMe".to_string()],
+            id:    vec!["removeMe".to_string()],
             class: vec![],
         };
         let plugin = RemoveElementsByAttrPlugin::with_config(config);
 
         let mut element = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element.set_attr("id", "removeMe");
 
@@ -312,10 +319,10 @@ mod tests {
 
         // Test element that shouldn't be removed
         let mut element2 = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element2.set_attr("id", "keepMe");
 
@@ -325,17 +332,17 @@ mod tests {
     #[test]
     fn test_should_remove_element_by_class() {
         let config = RemoveElementsByAttrConfig {
-            id: vec![],
+            id:    vec![],
             class: vec!["removeMe".to_string()],
         };
         let plugin = RemoveElementsByAttrPlugin::with_config(config);
 
         // Test element with matching class
         let mut element = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element.set_attr("class", "someClass removeMe anotherClass");
 
@@ -343,10 +350,10 @@ mod tests {
 
         // Test element that shouldn't be removed
         let mut element2 = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element2.set_attr("class", "someClass keepMe anotherClass");
 
@@ -356,7 +363,7 @@ mod tests {
     #[test]
     fn test_apply_removes_by_id() {
         let config = RemoveElementsByAttrConfig {
-            id: vec!["elementToRemove".to_string()],
+            id:    vec!["elementToRemove".to_string()],
             class: vec![],
         };
         let plugin = RemoveElementsByAttrPlugin::with_config(config);
@@ -364,20 +371,20 @@ mod tests {
 
         // Add element to remove
         let mut element_to_remove = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element_to_remove.set_attr("id", "elementToRemove");
         doc.root.children.push(Node::Element(element_to_remove));
 
         // Add element to keep
         let mut element_to_keep = Element {
-            name: "circle".into(),
+            name:       "circle".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element_to_keep.set_attr("id", "elementToKeep");
         doc.root.children.push(Node::Element(element_to_keep));
@@ -398,7 +405,7 @@ mod tests {
     #[test]
     fn test_apply_removes_by_class() {
         let config = RemoveElementsByAttrConfig {
-            id: vec![],
+            id:    vec![],
             class: vec!["removeMe".to_string()],
         };
         let plugin = RemoveElementsByAttrPlugin::with_config(config);
@@ -406,20 +413,20 @@ mod tests {
 
         // Add element to remove
         let mut element_to_remove = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element_to_remove.set_attr("class", "some-class removeMe another-class");
         doc.root.children.push(Node::Element(element_to_remove));
 
         // Add element to keep
         let mut element_to_keep = Element {
-            name: "circle".into(),
+            name:       "circle".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element_to_keep.set_attr("class", "some-class keep-me another-class");
         doc.root.children.push(Node::Element(element_to_keep));
@@ -431,10 +438,7 @@ mod tests {
         assert_eq!(doc.root.children.len(), 1);
         if let Node::Element(element) = &doc.root.children[0] {
             assert_eq!(element.name, "circle");
-            assert_eq!(
-                element.attr("class"),
-                Some("some-class keep-me another-class")
-            );
+            assert_eq!(element.attr("class"), Some("some-class keep-me another-class"));
         } else {
             panic!("Expected element");
         }
@@ -447,10 +451,10 @@ mod tests {
 
         // Add some elements
         let mut element = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         element.set_attr("id", "someId");
         doc.root.children.push(Node::Element(element));
@@ -465,7 +469,7 @@ mod tests {
     #[test]
     fn test_apply_recursive() {
         let config = RemoveElementsByAttrConfig {
-            id: vec!["removeMe".to_string()],
+            id:    vec!["removeMe".to_string()],
             class: vec![],
         };
         let plugin = RemoveElementsByAttrPlugin::with_config(config);
@@ -473,18 +477,18 @@ mod tests {
 
         // Create nested structure
         let mut nested_element = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         nested_element.set_attr("id", "removeMe");
 
         let mut group = Element {
-            name: "g".into(),
+            name:       "g".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![Node::Element(nested_element)],
+            children:   vec![Node::Element(nested_element)],
         };
         group.set_attr("id", "group");
 

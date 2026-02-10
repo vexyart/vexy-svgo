@@ -231,7 +231,7 @@ mod tests {
 
         // Non-element nodes should be preserved
         assert!(RemoveUselessDefsPlugin::should_preserve_node(
-            &Node::Comment("comment".to_string())
+            &Node::Comment("comment".to_string().into())
         ));
     }
 

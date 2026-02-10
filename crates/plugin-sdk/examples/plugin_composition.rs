@@ -76,10 +76,10 @@ fn create_test_document() -> Document<'static> {
     // Add children with comments and empty attributes
     doc.root
         .children
-        .push(Node::Comment("Regular comment to be removed".to_string()));
+        .push(Node::Comment("Regular comment to be removed".to_string().into_boxed_str()));
     doc.root
         .children
-        .push(Node::Comment("! Legal comment to be preserved".to_string()));
+        .push(Node::Comment("! Legal comment to be preserved".to_string().into_boxed_str()));
 
     let mut rect = Element::new("rect");
     rect.attributes.insert(Cow::Borrowed("x"), Cow::Borrowed("10"));
@@ -97,7 +97,7 @@ fn create_test_document() -> Document<'static> {
     doc.root.children.push(Node::Element(rect));
     doc.root
         .children
-        .push(Node::Comment("Another comment".to_string()));
+        .push(Node::Comment("Another comment".to_string().into_boxed_str()));
 
     doc
 }

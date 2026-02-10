@@ -119,7 +119,7 @@ mod unit_tests {
     }
 
     fn create_text(content: &str) -> Node<'static> {
-        Node::Text(content.to_string())
+        Node::Text(content.to_string().into())
     }
 
     #[test]
@@ -325,10 +325,10 @@ mod unit_tests {
         // Check that text nodes are preserved
         assert_eq!(doc.root.children.len(), 2);
         if let Node::Text(text) = &doc.root.children[0] {
-            assert_eq!(text, "Before title");
+            assert_eq!(text.as_ref(), "Before title");
         }
         if let Node::Text(text) = &doc.root.children[1] {
-            assert_eq!(text, "After title");
+            assert_eq!(text.as_ref(), "After title");
         }
     }
 

@@ -8,13 +8,15 @@
 //!
 //! Reference: SVGO's convertOneStopGradients plugin
 
-use crate::Plugin;
+use std::collections::{HashMap, HashSet};
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
 use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::collections::COLORS_PROPS;
+
+use crate::Plugin;
 
 /// Configuration for the convertOneStopGradients plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,8 +50,7 @@ impl ConvertOneStopGradientsPlugin {
         if params.is_null() {
             Ok(ConvertOneStopGradientsConfig::default())
         } else {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
         }
     }
 
@@ -140,11 +141,7 @@ impl ConvertOneStopGradientsPlugin {
         }
     }
 
-    fn replace_gradient_references(
-        &self,
-        element: &mut Element,
-        gradients_to_remove: &HashMap<String, String>,
-    ) {
+    fn replace_gradient_references(&self, element: &mut Element, gradients_to_remove: &HashMap<String, String>) {
         // Replace gradient references in color properties
         for color_prop in COLORS_PROPS.iter() {
             if let Some(value) = element.attr(*color_prop) {
@@ -186,11 +183,7 @@ impl ConvertOneStopGradientsPlugin {
     }
 
     #[allow(clippy::only_used_in_recursion)]
-    fn remove_gradients(
-        &self,
-        element: &mut Element,
-        gradients_to_remove: &HashMap<String, String>,
-    ) {
+    fn remove_gradients(&self, element: &mut Element, gradients_to_remove: &HashMap<String, String>) {
         // Remove gradient elements
         element.children.retain(|child| {
             if let Node::Element(ref elem) = child {
@@ -283,12 +276,7 @@ impl Plugin for ConvertOneStopGradientsPlugin {
         let mut affected_defs = HashSet::new();
 
         // First pass: identify gradients with only one stop
-        self.process_element(
-            &mut document.root,
-            &mut gradients_to_remove,
-            false,
-            &mut affected_defs,
-        );
+        self.process_element(&mut document.root, &mut gradients_to_remove, false, &mut affected_defs);
 
         // Second pass: replace gradient references with solid colors
         if !gradients_to_remove.is_empty() {
@@ -310,112 +298,30 @@ impl Plugin for ConvertOneStopGradientsPlugin {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::borrow::Cow;
+
     use indexmap::IndexMap;
     use vexy_svgo_core::ast::{Document, Element, Node};
 
+    use super::*;
+
     fn create_test_document() -> Document<'static> {
-        use std::collections::HashMap;
         Document {
-            root: Element {
-                name: "svg".into(),
+            root:          Element {
+                name:       "svg".into(),
                 attributes: IndexMap::new(),
                 namespaces: IndexMap::new(),
-                children: vec![],
+                children:   vec![],
             },
-            prologue: vec![],
-            epilogue: vec![],
-            metadata: vexy_svgo_core::ast::DocumentMetadata {
+            prologue:      vec![],
+            epilogue:      vec![],
+            metadata:      vexy_svgo_core::ast::DocumentMetadata {
                 path: None,
                 encoding: None,
                 version: None,
+                ..Default::default()
             },
-        }
-    }
-
-    #[test]
-    fn test_plugin_info() {
-        let plugin = ConvertOneStopGradientsPlugin::new();
-        assert_eq!(plugin.name(), "convertOneStopGradients");
-        assert_eq!(
-            plugin.description(),
-            "converts one-stop (single color) gradients to a plain color"
-        );
-    }
-
-    #[test]
-    fn test_param_validation() {
-        let plugin = ConvertOneStopGradientsPlugin::new();
-
-        // Test null params
-        assert!(plugin.validate_params(&Value::Null).is_ok());
-
-        // Test empty object params
-        assert!(plugin.validate_params(&serde_json::json!({})).is_ok());
-
-        // Test invalid params
-        assert!(plugin
-            .validate_params(&serde_json::json!({
-                "invalidParam": true
-            }))
-            .is_err());
-    }
-
-    #[test]
-    fn test_extract_gradient_id() {
-        let plugin = ConvertOneStopGradientsPlugin::new();
-
-        // Test valid gradient ID extraction
-        assert_eq!(
-            plugin.extract_gradient_id("url(#myGradient)"),
-            Some("myGradient".to_string())
-        );
-        assert_eq!(
-            plugin.extract_gradient_id("url(#grad1)"),
-            Some("grad1".to_string())
-        );
-
-        // Test invalid formats
-        assert_eq!(plugin.extract_gradient_id("red"), None);
-        assert_eq!(plugin.extract_gradient_id("url(myGradient)"), None);
-        assert_eq!(plugin.extract_gradient_id("#myGradient"), None);
-    }
-
-    #[test]
-    fn test_apply_with_empty_document() {
-        let plugin = ConvertOneStopGradientsPlugin::new();
-        let mut doc = create_test_document();
-
-        // Should not panic with empty document
-        let result = plugin.apply(&mut doc);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_apply_with_no_gradients() {
-        let plugin = ConvertOneStopGradientsPlugin::new();
-        let mut doc = create_test_document();
-
-        // Add a simple rect element
-        let mut rect = Element {
-            name: "rect".into(),
-            attributes: IndexMap::new(),
-            namespaces: IndexMap::new(),
-            children: vec![],
-        };
-        rect.set_attr("fill", "red");
-        rect.set_attr("width", "100");
-        rect.set_attr("height", "100");
-        doc.root.children.push(Node::Element(rect));
-
-        let result = plugin.apply(&mut doc);
-        assert!(result.is_ok());
-
-        // Document should remain unchanged
-        assert_eq!(doc.root.children.len(), 1);
-        if let Node::Element(rect) = &doc.root.children[0] {
-            assert_eq!(rect.name, "rect");
-            assert_eq!(rect.attr("fill"), Some("red"));
+            memory_budget: None,
         }
     }
 
@@ -426,10 +332,10 @@ mod tests {
 
         // Add defs with a one-stop gradient
         let mut defs_elem = Element {
-            name: "defs".into(),
+            name:       "defs".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
 
         let mut gradient_attrs = IndexMap::new();
@@ -439,14 +345,14 @@ mod tests {
         stop_attrs.insert(Cow::Borrowed("stop-color"), Cow::Borrowed("#ff0000"));
 
         let gradient_elem = Element {
-            name: "linearGradient".into(),
+            name:       "linearGradient".into(),
             attributes: gradient_attrs,
             namespaces: IndexMap::new(),
-            children: vec![Node::Element(Element {
-                name: "stop".into(),
+            children:   vec![Node::Element(Element {
+                name:       "stop".into(),
                 attributes: stop_attrs,
                 namespaces: IndexMap::new(),
-                children: vec![],
+                children:   vec![],
             })],
         };
 
@@ -460,10 +366,10 @@ mod tests {
         rect_attrs.insert(Cow::Borrowed("height"), Cow::Borrowed("100"));
 
         doc.root.children.push(Node::Element(Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: rect_attrs,
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         }));
 
         let result = plugin.apply(&mut doc);

@@ -2,7 +2,7 @@
 # this_file: rustfmt.toml
 
 # Use verbose diffs
-verbose = true
+verbose = "Verbose"
 
 # Version gate formatting
 edition = "2021"

@@ -100,17 +100,15 @@ jobs:
           key: wasm-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build WASM package
-        run: |
-          cd vexy_svgo
-          wasm-pack build --target web --features wasm
+        run: wasm-pack build crates/wasm --target web --features wasm
 
       - name: Test WASM build
         run: |
-          ls -la vexy_svgo/pkg/
+          ls -la pkg/
           # Verify essential WASM files were generated
-          test -f vexy_svgo/pkg/vexy_svgo.wasm
-          test -f vexy_svgo/pkg/vexy_svgo.js
-          test -f vexy_svgo/pkg/package.json
+          test -f pkg/vexy_svgo_wasm_bg.wasm
+          test -f pkg/vexy_svgo_wasm.js
+          test -f pkg/package.json
 
   docs-build:
     name: Documentation Build
@@ -150,7 +148,7 @@ jobs:
       - name: Test documentation
         run: |
           # Verify Rust docs were generated
-          test -d target/doc/vexy_svgo
+          test -d target/doc/vexy_svgo_core
           # Verify Jekyll site was built
           test -d docs/_site
           test -f docs/_site/index.html

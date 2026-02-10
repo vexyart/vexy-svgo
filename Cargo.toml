@@ -20,7 +20,7 @@ homepage = "https://github.com/vexyart/vexy-svgo"
 documentation = "https://docs.rs/vexy-svgo"
 keywords = ["svg", "svgo", "optimizer", "vector", "graphics"]
 categories = ["command-line-utilities", "multimedia::images", "template-engine", "web-programming", "wasm"]
-rust-version = "1.58.0"
+rust-version = "1.74.0"
 
 [workspace.dependencies]
 vexy-svgo-core = { path = "./crates/core", version = "1.0.35" }
@@ -61,13 +61,15 @@ jsonschema = "0.17"
 js-sys = "0.3"
 
 wee_alloc = "0.4"
-getrandom = { version = "0.2", features = ["js", "wasm-bindgen"] }
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js", "wasm-bindgen"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 usvg = "0.45.1"
 quick-xml = "0.31"
 parking_lot = "0.12"
 colored = "2.1"
 indicatif = "0.17"
 criterion = { version = "0.5", features = ["html_reports"] }
+bumpalo = { version = "3.16", features = ["collections"] }
 
 
 [profile.release]

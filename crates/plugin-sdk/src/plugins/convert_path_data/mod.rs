@@ -53,8 +53,8 @@ pub struct ConvertPathDataConfig {
     pub negative_extra_space: bool,
 
     /// Convert curves to arcs where geometrically appropriate
-    #[serde(default = "default_false")]
-    pub make_arcs: bool,
+    #[serde(default)]
+    pub make_arcs: MakeArcsConfig,
 
     /// Straighten curves that are nearly straight lines
     #[serde(default = "default_false")]
@@ -71,6 +71,44 @@ pub struct ConvertPathDataConfig {
     /// Tolerance for arc detection (smaller = more strict)
     #[serde(default = "default_arc_tolerance")]
     pub arc_tolerance: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MakeArcsConfig {
+    Enabled(bool),
+    Params(MakeArcsParams),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MakeArcsParams {
+    #[serde(default = "default_make_arcs_threshold")]
+    pub threshold: f64,
+    #[serde(default = "default_make_arcs_tolerance")]
+    pub tolerance: f64,
+}
+
+impl MakeArcsConfig {
+    fn is_enabled(&self) -> bool {
+        match self {
+            Self::Enabled(enabled) => *enabled,
+            Self::Params(_) => true,
+        }
+    }
+
+    fn tolerance(&self, default_tolerance: f64) -> f64 {
+        match self {
+            Self::Params(params) => params.tolerance,
+            Self::Enabled(_) => default_tolerance,
+        }
+    }
+}
+
+impl Default for MakeArcsConfig {
+    fn default() -> Self {
+        Self::Enabled(false)
+    }
 }
 
 fn default_float_precision() -> u8 {
@@ -97,6 +135,14 @@ fn default_arc_tolerance() -> f64 {
     0.5
 }
 
+fn default_make_arcs_threshold() -> f64 {
+    2.5
+}
+
+fn default_make_arcs_tolerance() -> f64 {
+    0.5
+}
+
 impl Default for ConvertPathDataConfig {
     fn default() -> Self {
         Self {
@@ -107,7 +153,7 @@ impl Default for ConvertPathDataConfig {
             utilize_absolute: true,
             leading_zero: true,
             negative_extra_space: true,
-            make_arcs: false,
+            make_arcs: MakeArcsConfig::default(),
             straight_curves: false,
             convert_to_q: false,
             curve_tolerance: default_curve_tolerance(),
@@ -186,6 +232,11 @@ impl Plugin for ConvertPathDataPlugin {
 
     fn validate_params(&self, params: &Value) -> Result<()> {
         Self::parse_config(params)?;
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
         Ok(())
     }
 
@@ -546,8 +597,8 @@ fn optimize_path_data(path_data: &str, config: &ConvertPathDataConfig) -> Result
         commands = convert_cubic_to_quadratic(commands, config.curve_tolerance);
     }
 
-    if config.make_arcs {
-        commands = convert_curves_to_arcs(commands, config.arc_tolerance);
+    if config.make_arcs.is_enabled() {
+        commands = convert_curves_to_arcs(commands, config.make_arcs.tolerance(config.arc_tolerance));
     }
 
     // Convert back to string
@@ -1480,7 +1531,7 @@ mod tests {
             utilize_absolute: true,
             leading_zero: true,
             negative_extra_space: true,
-            make_arcs: false,
+            make_arcs: MakeArcsConfig::Enabled(false),
             straight_curves: false,
             convert_to_q: false,
             curve_tolerance: 0.1,

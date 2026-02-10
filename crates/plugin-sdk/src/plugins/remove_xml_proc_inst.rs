@@ -6,11 +6,12 @@
 //! Processing instructions like <?xml version="1.0" encoding="utf-8"?> are
 //! not needed in SVG documents and can be safely removed.
 
-use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Node};
+
+use crate::Plugin;
 
 /// Configuration parameters for remove XML processing instruction plugin (currently empty)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,11 +33,47 @@ pub struct RemoveXMLProcInstPlugin {
 }
 
 impl RemoveXMLProcInstPlugin {
+    fn is_formatting_whitespace(text: &str) -> bool {
+        text.trim().is_empty() && text.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    }
+
+    fn cleanup_formatting_whitespace(nodes: &mut Vec<Node>) {
+        let has_non_whitespace_content = nodes.iter().any(|node| match node {
+            Node::Element(_) => true,
+            Node::Text(text) => !text.trim().is_empty(),
+            Node::Comment(_) | Node::ProcessingInstruction { .. } | Node::DocType(_) | Node::CData(_) => true,
+        });
+
+        if has_non_whitespace_content {
+            nodes.retain(|node| !matches!(node, Node::Text(text) if Self::is_formatting_whitespace(text)));
+        }
+    }
+
+    fn cleanup_formatting_whitespace_recursive(element: &mut vexy_svgo_core::ast::Element<'_>) {
+        let preserve = matches!(element.name.as_ref(), "text" | "tspan" | "tref" | "textPath" | "altGlyph");
+        for child in &mut element.children {
+            if let Node::Text(text) = child {
+                if !preserve && (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        *text = trimmed.to_string().into();
+                    }
+                }
+            }
+        }
+        Self::cleanup_formatting_whitespace(&mut element.children);
+        for child in &mut element.children {
+            if let Node::Element(child_element) = child {
+                Self::cleanup_formatting_whitespace_recursive(child_element);
+            }
+        }
+    }
+
     /// Create a new RemoveXMLProcInstPlugin
     pub fn new() -> Self {
         Self {
             #[allow(dead_code)]
-            config: RemoveXMLProcInstConfig::default(),
+            config:                     RemoveXMLProcInstConfig::default(),
         }
     }
 
@@ -48,8 +85,7 @@ impl RemoveXMLProcInstPlugin {
     /// Parse configuration from JSON
     fn _parse_config(params: &Value) -> Result<RemoveXMLProcInstConfig> {
         if params.is_object() {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
         } else {
             Ok(RemoveXMLProcInstConfig::default())
         }
@@ -74,38 +110,42 @@ impl Plugin for RemoveXMLProcInstPlugin {
     fn validate_params(&self, params: &Value) -> Result<()> {
         if let Some(obj) = params.as_object() {
             if !obj.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "removeXMLProcInst plugin does not accept any parameters"
-                ));
+                return Err(anyhow::anyhow!("removeXMLProcInst plugin does not accept any parameters"));
             }
         }
         Ok(())
     }
 
     fn apply(&self, document: &mut Document) -> Result<()> {
+        document.metadata.version = None;
+        document.metadata.encoding = None;
+
         // Remove all XML processing instruction nodes from the document prologue
         document.prologue.retain(|child| {
             // Remove ProcessingInstruction nodes with target "xml"
             if let Node::ProcessingInstruction { target, .. } = child {
                 // Check if it's an XML processing instruction
-                if target == "xml" {
+                if target.eq_ignore_ascii_case("xml") {
                     return false; // Remove this node
                 }
             }
             true // Keep all other nodes
         });
+        Self::cleanup_formatting_whitespace(&mut document.prologue);
 
         // Also remove XML processing instructions from root children (in case they were misplaced)
         document.root.children.retain(|child| {
             // Remove ProcessingInstruction nodes with target "xml"
             if let Node::ProcessingInstruction { target, .. } = child {
                 // Check if it's an XML processing instruction
-                if target == "xml" {
+                if target.eq_ignore_ascii_case("xml") {
                     return false; // Remove this node
                 }
             }
             true // Keep all other nodes
         });
+        Self::cleanup_formatting_whitespace_recursive(&mut document.root);
+        Self::cleanup_formatting_whitespace(&mut document.epilogue);
 
         Ok(())
     }
@@ -113,10 +153,12 @@ impl Plugin for RemoveXMLProcInstPlugin {
 
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
-    use serde_json::json;
     use std::borrow::Cow;
+
+    use serde_json::json;
     use vexy_svgo_core::ast::{Document, Element, Node};
+
+    use super::*;
 
     fn create_element(name: &'static str) -> Element<'static> {
         let mut element = Element::new(name);
@@ -149,8 +191,8 @@ mod unit_tests {
 
         // Add an XML processing instruction
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "version=\"1.0\" encoding=\"UTF-8\"".to_string(),
+            target: "xml".into(),
+            data:   "version=\"1.0\" encoding=\"UTF-8\"".to_string().into(),
         });
 
         // Add a regular element
@@ -172,8 +214,8 @@ mod unit_tests {
 
         // Add a simple XML processing instruction
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "".to_string(),
+            target: "xml".into(),
+            data:   "".to_string().into(),
         });
 
         // Add a regular element
@@ -195,14 +237,14 @@ mod unit_tests {
 
         // Add XML processing instruction (should be removed)
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "version=\"1.0\"".to_string(),
+            target: "xml".into(),
+            data:   "version=\"1.0\"".to_string().into(),
         });
 
         // Add other processing instruction (should be kept)
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "stylesheet".to_string(),
-            data: "type=\"text/css\"".to_string(),
+            target: "stylesheet".into(),
+            data:   "type=\"text/css\"".to_string().into(),
         });
 
         // Add a regular element
@@ -214,15 +256,12 @@ mod unit_tests {
 
         // Should have removed only the XML processing instruction
         assert_eq!(doc.root.children.len(), 2);
-        assert!(matches!(
-            doc.root.children[0],
-            Node::ProcessingInstruction { .. }
-        ));
+        assert!(matches!(doc.root.children[0], Node::ProcessingInstruction { .. }));
         assert!(matches!(doc.root.children[1], Node::Element(_)));
 
         // Check that the remaining processing instruction is not XML
         if let Node::ProcessingInstruction { target, .. } = &doc.root.children[0] {
-            assert_eq!(target, "stylesheet");
+            assert_eq!(target.as_ref(), "stylesheet");
         }
     }
 
@@ -233,12 +272,12 @@ mod unit_tests {
 
         // Add multiple XML processing instructions
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "version=\"1.0\"".to_string(),
+            target: "xml".into(),
+            data:   "version=\"1.0\"".to_string().into(),
         });
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "encoding=\"UTF-8\"".to_string(),
+            target: "xml".into(),
+            data:   "encoding=\"UTF-8\"".to_string().into(),
         });
 
         // Add a regular element
@@ -277,10 +316,10 @@ mod unit_tests {
 
         // Add XML processing instruction, text, and element
         doc.root.children.push(Node::ProcessingInstruction {
-            target: "xml".to_string(),
-            data: "version=\"1.0\"".to_string(),
+            target: "xml".into(),
+            data:   "version=\"1.0\"".to_string().into(),
         });
-        doc.root.children.push(Node::Text("Some text".to_string()));
+        doc.root.children.push(Node::Text("Some text".to_string().into()));
         let svg = create_element("svg");
         doc.root.children.push(Node::Element(svg));
 

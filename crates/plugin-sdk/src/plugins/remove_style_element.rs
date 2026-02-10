@@ -7,11 +7,12 @@
 //!
 //! Reference: SVGO's removeStyleElement plugin
 
-use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
+
+use crate::Plugin;
 
 /// Configuration parameters for remove style element plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +38,7 @@ impl RemoveStyleElementPlugin {
     pub fn new() -> Self {
         Self {
             #[allow(dead_code)]
-            config: RemoveStyleElementConfig::default(),
+            config:                     RemoveStyleElementConfig::default(),
         }
     }
 
@@ -51,8 +52,7 @@ impl RemoveStyleElementPlugin {
         if params.is_null() {
             Ok(RemoveStyleElementConfig::default())
         } else if params.is_object() {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid configuration: {}", e))
         } else {
             Err(anyhow::anyhow!("Configuration must be an object"))
         }
@@ -106,10 +106,12 @@ impl Plugin for RemoveStyleElementPlugin {
 
 #[cfg(test)]
 mod unit_tests {
-    use super::*;
-    use serde_json::json;
     use std::borrow::Cow;
+
+    use serde_json::json;
     use vexy_svgo_core::ast::{Document, Element, Node};
+
+    use super::*;
 
     fn create_element(name: &'static str) -> Element<'static> {
         let mut element = Element::new(name);
@@ -121,10 +123,7 @@ mod unit_tests {
     fn test_plugin_creation() {
         let plugin = RemoveStyleElementPlugin::new();
         assert_eq!(plugin.name(), "removeStyleElement");
-        assert_eq!(
-            plugin.description(),
-            "removes <style> element (disabled by default)"
-        );
+        assert_eq!(plugin.description(), "removes <style> element (disabled by default)");
     }
 
     #[test]
@@ -136,9 +135,7 @@ mod unit_tests {
 
         // Add style element
         let mut style = create_element("style");
-        style
-            .children
-            .push(Node::Text(".red { fill: red; }".to_string()));
+        style.children.push(Node::Text(".red { fill: red; }".to_string().into()));
         doc.root.children.push(Node::Element(style));
 
         // Add other elements
@@ -166,18 +163,14 @@ mod unit_tests {
 
         // Add multiple style elements
         let mut style1 = create_element("style");
-        style1
-            .children
-            .push(Node::Text(".class1 { fill: blue; }".to_string()));
+        style1.children.push(Node::Text(".class1 { fill: blue; }".to_string().into()));
         doc.root.children.push(Node::Element(style1));
 
         let circle = create_element("circle");
         doc.root.children.push(Node::Element(circle));
 
         let mut style2 = create_element("style");
-        style2
-            .children
-            .push(Node::Text(".class2 { stroke: green; }".to_string()));
+        style2.children.push(Node::Text(".class2 { stroke: green; }".to_string().into()));
         doc.root.children.push(Node::Element(style2));
 
         // Apply plugin
@@ -200,9 +193,7 @@ mod unit_tests {
         // Create nested structure
         let mut defs = create_element("defs");
         let mut style = create_element("style");
-        style
-            .children
-            .push(Node::Text("#id { opacity: 0.5; }".to_string()));
+        style.children.push(Node::Text("#id { opacity: 0.5; }".to_string().into()));
         defs.children.push(Node::Element(style));
 
         let gradient = create_element("linearGradient");
@@ -213,9 +204,7 @@ mod unit_tests {
         // Add style in another group
         let mut group = create_element("g");
         let mut nested_style = create_element("style");
-        nested_style
-            .children
-            .push(Node::Text(".nested { fill: yellow; }".to_string()));
+        nested_style.children.push(Node::Text(".nested { fill: yellow; }".to_string().into()));
         group.children.push(Node::Element(nested_style));
 
         let path = create_element("path");
@@ -256,9 +245,7 @@ mod unit_tests {
 
         // Add style element
         let mut style = create_element("style");
-        style
-            .children
-            .push(Node::Text(".class { fill: green; }".to_string()));
+        style.children.push(Node::Text(".class { fill: green; }".to_string().into()));
         doc.root.children.push(Node::Element(style));
 
         // Apply plugin
@@ -292,15 +279,9 @@ mod unit_tests {
         doc.root = create_element("svg");
 
         // Add non-style elements
-        doc.root
-            .children
-            .push(Node::Element(create_element("rect")));
-        doc.root
-            .children
-            .push(Node::Element(create_element("circle")));
-        doc.root
-            .children
-            .push(Node::Element(create_element("path")));
+        doc.root.children.push(Node::Element(create_element("rect")));
+        doc.root.children.push(Node::Element(create_element("circle")));
+        doc.root.children.push(Node::Element(create_element("path")));
 
         let children_before = doc.root.children.len();
 
@@ -322,9 +303,7 @@ mod unit_tests {
         let mut style = create_element("style");
         style.set_attr("type", "text/css");
         style.set_attr("media", "screen");
-        style.children.push(Node::Text(
-            "@media print { .no-print { display: none; } }".to_string(),
-        ));
+        style.children.push(Node::Text("@media print { .no-print { display: none; } }".into()));
         doc.root.children.push(Node::Element(style));
 
         // Apply plugin
@@ -357,9 +336,7 @@ mod unit_tests {
 
         // Add style with CDATA content
         let mut style = create_element("style");
-        style.children.push(Node::Text(
-            "<![CDATA[ .class { fill: red; } ]]>".to_string(),
-        ));
+        style.children.push(Node::Text("<![CDATA[ .class { fill: red; } ]]>".into()));
         doc.root.children.push(Node::Element(style));
 
         // Apply plugin

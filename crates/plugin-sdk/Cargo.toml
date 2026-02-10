@@ -83,6 +83,14 @@ workspace = true
 workspace = true
 
 
+[dependencies.usvg]
+workspace = true
+
+
 [dev-dependencies]
 proptest = "1.0"
 vexy-svgo-test-utils = { path = "../test-utils" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,21 @@
+# this_file: .github/workflows/msrv.yml
+name: MSRV Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install MSRV Rust
+      uses: dtolnay/rust-toolchain@1.74.0
+    - name: Check MSRV
+      run: cargo check --workspace

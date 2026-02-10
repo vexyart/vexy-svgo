@@ -8,11 +8,12 @@
 //!
 //! Reference: SVGO's removeDimensions plugin
 
-use crate::Plugin;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vexy_svgo_core::ast::{Document, Element, Node};
+
+use crate::Plugin;
 
 /// Configuration for the removeDimensions plugin
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +36,7 @@ impl RemoveDimensionsPlugin {
     pub fn new() -> Self {
         Self {
             #[allow(dead_code)]
-            config: RemoveDimensionsConfig::default(),
+            config:                     RemoveDimensionsConfig::default(),
         }
     }
 
@@ -47,8 +48,7 @@ impl RemoveDimensionsPlugin {
         if params.is_null() {
             Ok(RemoveDimensionsConfig::default())
         } else {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
+            serde_json::from_value(params.clone()).map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))
         }
     }
 
@@ -57,8 +57,10 @@ impl RemoveDimensionsPlugin {
             return;
         }
 
+        let had_viewbox = element.has_attr("viewBox");
+
         // If viewBox already exists, just remove width and height
-        if element.has_attr("viewBox") {
+        if had_viewbox {
             element.remove_attr("width");
             element.remove_attr("height");
         } else {
@@ -68,9 +70,7 @@ impl RemoveDimensionsPlugin {
 
             if let (Some(width_str), Some(height_str)) = (width_str, height_str) {
                 // Try to parse width and height as numbers
-                if let (Ok(width), Ok(height)) =
-                    (width_str.parse::<f64>(), height_str.parse::<f64>())
-                {
+                if let (Ok(width), Ok(height)) = (width_str.parse::<f64>(), height_str.parse::<f64>()) {
                     // Only proceed if both are valid numbers (not NaN)
                     if !width.is_nan() && !height.is_nan() {
                         // Create viewBox and remove width/height
@@ -82,6 +82,10 @@ impl RemoveDimensionsPlugin {
                 }
             }
         }
+
+        // Note: We do NOT add preserveAspectRatio="xMidYMid meet" here because
+        // that is already the SVG spec default value. Adding it explicitly would be
+        // redundant and would be stripped by removeUnknownsAndDefaults anyway.
     }
 
     fn process_element(&self, element: &mut Element) {
@@ -127,26 +131,30 @@ impl Plugin for RemoveDimensionsPlugin {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use indexmap::IndexMap;
     use std::collections::HashMap;
+
+    use indexmap::IndexMap;
     use vexy_svgo_core::ast::{Document, Element, Node};
+
+    use super::*;
 
     fn create_test_document() -> Document<'static> {
         Document {
-            root: Element {
-                name: "svg".into(),
+            root:          Element {
+                name:       "svg".into(),
                 attributes: IndexMap::new(),
                 namespaces: IndexMap::new(),
-                children: vec![],
+                children:   vec![],
             },
-            prologue: vec![],
-            epilogue: vec![],
-            metadata: vexy_svgo_core::ast::DocumentMetadata {
+            prologue:      vec![],
+            epilogue:      vec![],
+            metadata:      vexy_svgo_core::ast::DocumentMetadata {
                 path: None,
                 encoding: None,
                 version: None,
+                ..Default::default()
             },
+            memory_budget: None,
         }
     }
 
@@ -154,10 +162,7 @@ mod tests {
     fn test_plugin_info() {
         let plugin = RemoveDimensionsPlugin::new();
         assert_eq!(plugin.name(), "removeDimensions");
-        assert_eq!(
-            plugin.description(),
-            "removes width and height in presence of viewBox (opposite to removeViewBox)"
-        );
+        assert_eq!(plugin.description(), "removes width and height in presence of viewBox (opposite to removeViewBox)");
     }
 
     #[test]
@@ -195,6 +200,8 @@ mod tests {
         assert!(!doc.root.has_attr("width"));
         assert!(!doc.root.has_attr("height"));
         assert_eq!(doc.root.attr("viewBox"), Some("0 0 200 100"));
+        // preserveAspectRatio is NOT added because "xMidYMid meet" is the SVG default
+        assert!(!doc.root.has_attr("preserveAspectRatio"));
     }
 
     #[test]
@@ -213,6 +220,7 @@ mod tests {
         assert!(!doc.root.has_attr("width"));
         assert!(!doc.root.has_attr("height"));
         assert_eq!(doc.root.attr("viewBox"), Some("0 0 100 50"));
+        assert!(!doc.root.has_attr("preserveAspectRatio"));
     }
 
     #[test]
@@ -231,6 +239,7 @@ mod tests {
         assert!(!doc.root.has_attr("width"));
         assert!(!doc.root.has_attr("height"));
         assert_eq!(doc.root.attr("viewBox"), Some("0 0 100.5 50.25"));
+        assert!(!doc.root.has_attr("preserveAspectRatio"));
     }
 
     #[test]
@@ -274,10 +283,10 @@ mod tests {
 
         // Add a rect element with width and height (should not be processed)
         let mut rect = Element {
-            name: "rect".into(),
+            name:       "rect".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         rect.set_attr("width", "100");
         rect.set_attr("height", "50");
@@ -310,10 +319,10 @@ mod tests {
 
         // Add nested SVG element
         let mut nested_svg = Element {
-            name: "svg".into(),
+            name:       "svg".into(),
             attributes: IndexMap::new(),
             namespaces: IndexMap::new(),
-            children: vec![],
+            children:   vec![],
         };
         nested_svg.set_attr("width", "100");
         nested_svg.set_attr("height", "50");
@@ -327,12 +336,14 @@ mod tests {
         assert!(!doc.root.has_attr("width"));
         assert!(!doc.root.has_attr("height"));
         assert_eq!(doc.root.attr("viewBox"), Some("0 0 200 100"));
+        assert!(!doc.root.has_attr("preserveAspectRatio"));
 
         // Nested SVG should also be processed
         if let Node::Element(nested_svg) = &doc.root.children[0] {
             assert!(!nested_svg.has_attr("width"));
             assert!(!nested_svg.has_attr("height"));
             assert_eq!(nested_svg.attr("viewBox"), Some("0 0 100 50"));
+            assert!(!nested_svg.has_attr("preserveAspectRatio"));
         } else {
             panic!("Expected nested SVG element");
         }
@@ -354,6 +365,23 @@ mod tests {
         assert!(!doc.root.has_attr("width"));
         assert!(!doc.root.has_attr("height"));
         assert_eq!(doc.root.attr("viewBox"), Some("0 0 0 0"));
+        assert!(!doc.root.has_attr("preserveAspectRatio"));
+    }
+
+    #[test]
+    fn test_existing_preserve_aspect_ratio_is_not_overwritten() {
+        let plugin = RemoveDimensionsPlugin::new();
+        let mut doc = create_test_document();
+
+        doc.root.set_attr("width", "100");
+        doc.root.set_attr("height", "50");
+        doc.root.set_attr("viewBox", "0 0 100 50");
+        doc.root.set_attr("preserveAspectRatio", "none");
+
+        let result = plugin.apply(&mut doc);
+        assert!(result.is_ok());
+
+        assert_eq!(doc.root.attr("preserveAspectRatio"), Some("none"));
     }
 
     #[test]

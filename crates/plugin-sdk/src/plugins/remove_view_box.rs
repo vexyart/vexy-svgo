@@ -8,7 +8,7 @@
 use crate::Plugin;
 use anyhow::Result;
 use std::collections::HashSet;
-use vexy_svgo_core::ast::{Document, Element};
+use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
 use vexy_svgo_core::error::VexyError;
 
@@ -47,7 +47,10 @@ impl RemoveViewBoxPlugin {
         };
 
         // Parse viewBox values
-        let viewbox_parts: Vec<&str> = viewbox_attr.split(&[' ', ','][..]).collect();
+        let viewbox_parts: Vec<&str> = viewbox_attr
+            .split(|c: char| c.is_whitespace() || c == ',')
+            .filter(|part| !part.is_empty())
+            .collect();
         if viewbox_parts.len() != 4 {
             return false;
         }
@@ -63,6 +66,47 @@ impl RemoveViewBoxPlugin {
 
         // Check if width and height match viewBox dimensions
         viewbox_parts[2] == width_value && viewbox_parts[3] == height_value
+    }
+
+    fn is_formatting_whitespace(text: &str) -> bool {
+        text.trim().is_empty() && text.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    }
+
+    fn cleanup_formatting_whitespace(nodes: &mut Vec<Node>) {
+        let has_non_whitespace_content = nodes.iter().any(|node| match node {
+            Node::Element(_) => true,
+            Node::Text(text) => !text.trim().is_empty(),
+            _ => false,
+        });
+
+        if has_non_whitespace_content {
+            nodes.retain(|node| {
+                !matches!(node, Node::Text(text) if Self::is_formatting_whitespace(text))
+            });
+        }
+    }
+
+    fn cleanup_formatting_whitespace_recursive(element: &mut Element<'_>) {
+        let preserve = matches!(
+            element.name.as_ref(),
+            "text" | "tspan" | "tref" | "textPath" | "altGlyph"
+        );
+        for child in &mut element.children {
+            if let Node::Text(text) = child {
+                if !preserve && (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        *text = trimmed.to_string().into();
+                    }
+                }
+            }
+        }
+        Self::cleanup_formatting_whitespace(&mut element.children);
+        for child in &mut element.children {
+            if let Node::Element(child_element) = child {
+                Self::cleanup_formatting_whitespace_recursive(child_element);
+            }
+        }
     }
 }
 
@@ -95,6 +139,7 @@ impl Plugin for RemoveViewBoxPlugin {
     fn apply(&self, document: &mut Document) -> anyhow::Result<()> {
         let mut visitor = ViewBoxRemovalVisitor::new();
         vexy_svgo_core::visitor::walk_document(&mut visitor, document)?;
+        Self::cleanup_formatting_whitespace_recursive(&mut document.root);
         Ok(())
     }
 }

@@ -1,0 +1,229 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1770674112962,
+  "projectRoot": "/Users/adam/Developer/vcs3/github.vexyart/vexy-svgo",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Rust",
+        "version": "1.58.0",
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      },
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
+      },
+      {
+        "name": "C/C++",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Makefile"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "cargo test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "scripts",
+      "test"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "crates": {
+      "path": "crates",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1770674112957,
+      "keyFiles": []
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1770674112958,
+      "keyFiles": [
+        "vexy-svgo-1.0.35-macos-universal.tar.gz",
+        "vexy-svgo-macos-universal"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 6,
+      "lastAccessed": 1770674112958,
+      "keyFiles": [
+        "404.html",
+        "index.html",
+        "sitemap.xml",
+        "sitemap.xml.gz"
+      ]
+    },
+    "docs_src": {
+      "path": "docs_src",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1770674112958,
+      "keyFiles": [
+        "index.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 8,
+      "lastAccessed": 1770674112959,
+      "keyFiles": [
+        "cli-usage.md",
+        "memory-profiling.rs",
+        "nodejs-integration.js",
+        "rust-integration.rs",
+        "wasm-browser.html"
+      ]
+    },
+    "issues": {
+      "path": "issues",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1770674112959,
+      "keyFiles": [
+        "100.txt",
+        "110.txt",
+        "120.txt",
+        "121.txt",
+        "122.txt"
+      ]
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1770674112959,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 18,
+      "lastAccessed": 1770674112959,
+      "keyFiles": [
+        "README-benchmarks.md",
+        "benchmark-comprehensive.sh",
+        "benchmark1.sh",
+        "build-all-platforms.sh",
+        "build-all.sh"
+      ]
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1770674112959,
+      "keyFiles": [
+        "CACHEDIR.TAG"
+      ]
+    },
+    "test": {
+      "path": "test",
+      "purpose": "Test files",
+      "fileCount": 5,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "fixture_tests.rs",
+        "generated_plugin_tests.rs",
+        "integration_test.rs",
+        "svgo_compatibility_tests.rs"
+      ]
+    },
+    "testdata": {
+      "path": "testdata",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "svgo_fixture_migration_report.md"
+      ]
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "favicon.ico"
+      ]
+    },
+    "docs/data": {
+      "path": "docs/data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "benchmarks.json"
+      ]
+    },
+    "docs_src/assets": {
+      "path": "docs_src/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "favicon.ico"
+      ]
+    },
+    "docs_src/data": {
+      "path": "docs_src/data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1770674112960,
+      "keyFiles": [
+        "benchmarks.json"
+      ]
+    },
+    "scripts/dist": {
+      "path": "scripts/dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 5,
+      "lastAccessed": 1770674112961,
+      "keyFiles": [
+        "README.md",
+        "build_linux.sh",
+        "build_macos.sh"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

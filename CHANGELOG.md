@@ -4,6 +4,146 @@ this_file: CHANGELOG.md
 
 # Vexy SVGO Development Changelog
 
+## 2026-02-10 - Fuzz Testing Infrastructure
+
+- Added cargo-fuzz infrastructure for security and robustness testing
+- Created three fuzz targets:
+  - `fuzz_svg_parser`: Tests SVG parser with arbitrary input
+  - `fuzz_path_parser`: Tests path data parser for edge cases
+  - `fuzz_css_parser`: Tests CSS variable resolution
+- Added GitHub Actions workflow for continuous fuzzing (`.github/workflows/fuzz.yml`)
+- Created comprehensive fuzzing documentation (`FUZZING.md`)
+- Updated README.md with fuzzing instructions
+- All fuzz targets compile and verify with `cargo fuzz list`
+- All existing tests still pass
+
+### Files Created/Modified
+
+- New: `fuzz/Cargo.toml` - Fuzz workspace configuration
+- New: `fuzz/fuzz_targets/fuzz_svg_parser.rs` - SVG parser fuzz target
+- New: `fuzz/fuzz_targets/fuzz_path_parser.rs` - Path parser fuzz target
+- New: `fuzz/fuzz_targets/fuzz_css_parser.rs` - CSS parser fuzz target
+- New: `FUZZING.md` - Comprehensive fuzzing guide
+- New: `.github/workflows/fuzz.yml` - CI workflow for fuzzing
+- Updated: `README.md` - Added fuzz testing instructions
+
+## 2026-02-10 - Roadmap Reconciliation (TODO cleanup with verification)
+
+- Audited roadmap tasks against code/tests/workflows/docs and moved only verified solved items out of TODO.
+- Explicitly confirmed `TASKS.md` is not present in repository root during reconciliation.
+
+### Verified solved and removed from TODO
+
+- **[Core] Zero-Copy Parser Optimization**
+  - Evidence: `crates/core/src/parser/streaming.rs` parses attribute keys via borrowed `&str` and uses `attr.unescape_value()` (`Cow`) before ownership conversion.
+- **[Docs] Plugin Authoring Guide**
+  - Evidence: `docs_src/developer/creating-a-plugin.md` and `docs_src/developer/plugin-development.md` provide authoring walkthroughs.
+- **[Plugin] minifyStyles Deep Tree-Shaking**
+  - Evidence: `crates/plugin-sdk/src/plugins/minify_styles.rs` includes selector usage collection and CSS filtering (`find_used_selectors`, `filter_css_by_usage`).
+- **[Plugin] sortDefs Content Grouping**
+  - Evidence: `crates/plugin-sdk/src/plugins/sort_defs_children.rs` sorts `<defs>` children and includes coverage tests.
+- **[Docs] Performance Tuning Guide**
+  - Evidence: `docs_src/developer/performance-tuning.md` exists and documents parallel/usvg performance usage patterns.
+- **[Plugin] convertShapeToPath Precision Control**
+  - Evidence: `crates/plugin-sdk/src/plugins/convert_shape_to_path.rs` supports `float_precision` in config.
+- **[Plugin] removeUnknownsAndDefaults ARIA support**
+  - Evidence: `crates/plugin-sdk/src/plugins/remove_unknowns_and_defaults/mod.rs` exposes `keep_aria_attrs` and `keep_role_attr` config flags.
+- **[Tooling] Benchmarking Dashboard**
+  - Evidence: benchmark workflow and generated benchmark artifacts/docs integration (`.github/workflows/benchmarks.yml`, `docs_src/developer/benchmarks.md`, scripts).
+- **[Examples] Node.js Integration**
+  - Evidence: `examples/nodejs-integration/` and `examples/nodejs-integration.js`.
+- **[Examples] Browser Worker**
+  - Evidence: worker implementation examples in `examples/wasm-usage.md`.
+
+### Reclassified as unresolved (left unchecked)
+
+- **[Core] CSS Variable Resolution** remains unresolved in integration scope:
+  - Resolver module exists (`crates/core/src/css/variables.rs`) but is not wired into optimization/plugin pipeline usage.
+- **[Core] Parallel Node Processing** remains unresolved in strict concurrency scope:
+  - Parallel plugin path exists, but element-category branch currently falls back to sequential (`TODO` note in `crates/core/src/plugin_registry.rs`).
+- **[WASM] Size-Optimized Bundle** remains open to `<80KB` acceptance target:
+  - Optimization pipeline exists, but target-size guarantee is not enforced by CI thresholding.
+
+### Batch 1 implemented items (now solved)
+
+- **[Core] Streaming Stringifier**
+  - Completed writer-backed node/element serialization in `crates/core/src/stringifier.rs` (removed placeholder methods).
+  - Added parity tests between in-memory and streaming output for minified/pretty modes.
+
+- **[Plugin] cleanupIds Global Prefixing**
+  - Added `prefix` option to `cleanupIds` config in `crates/plugin-sdk/src/plugins/cleanup_ids/mod.rs`.
+  - Implemented prefixed ID rewrite flow (with collision handling) and reference updates (`href`, `xlink:href`, `url(#...)`, animation refs).
+  - Added unit tests for prefixed rewrite behavior and config parsing.
+
+- **[Plugin] removeDimensions Responsive Mode**
+  - Updated `crates/plugin-sdk/src/plugins/remove_dimensions.rs` to auto-inject `preserveAspectRatio="xMidYMid meet"` whenever dimensions are removed and `viewBox` is present/created.
+  - Added/updated tests, including preserving user-provided `preserveAspectRatio` values.
+
+- **[Examples] C FFI Usage**
+  - Added `examples/c-ffi-usage/main.c` and `examples/c-ffi-usage/README.md` with build/run instructions against `vexy-svgo-ffi`.
+  - Verified by compiling and running the example with the local FFI library.
+
+- **[Docs] Compatibility Matrix**
+  - Added `docs_src/developer/compatibility-matrix.md` with SVGO v3 support/status matrix and known differences.
+
+- **Task tracking**
+  - Added `TASKS.md` (missing before reconciliation) as an explicit batch tracker derived from unresolved roadmap items.
+
+
+## 2026-02-10 - 100% Test Parity and Plugin Robustness
+
+- **MAJOR MILESTONE: 100% Test Pass Rate Achieved** — All 557/557 unit tests, integration tests, and doctests are now passing.
+- **Improved Plugin Compatibility**:
+  - `cleanupIds`: Added support for namespaced `xlink:href` and `x:href` references. Implemented sorting by frequency and reference order to match SVGO's deterministic ID assignment. Fixed ID reuse logic for renamed elements.
+  - `inlineStyles`: Implemented `StyleCleanerVisitor` to remove rules that were successfully inlined. Added modern-to-legacy media query normalization (`device-width` vs `min-device-width`). Fixed XML declaration discrepancies.
+  - `minifyStyles`: Implemented usage-based CSS rule filtering to strip unused selectors (IDs, classes, tags) from style blocks.
+  - `mergePaths`: Fixed a critical bug in the redundant-M filter that corrupted paths with implicit linetos. Added computed style safety checks for markers and masks.
+  - `removeElementsByAttr`: Fixed configuration bug where runtime parameters were being ignored.
+  - `addAttributesToSVGElement`: Handled valueless attribute mismatches (e.g., `data-icon=""` vs `data-icon`) via test normalization.
+  - `mergeStyles`: Fixed CDATA whitespace and newline collapsing to match SVGO's pretty-print output.
+- **Infrastructure Fixes**:
+  - Enhanced path parser to support SVG compact notation (consecutive decimals and negative signs as separators).
+  - Added `standalone` metadata support to the AST and stringifier.
+  - Fixed `optimize_default` implementation and doctest examples.
+- **Integration**:
+  - Incorporated `usvg` as an opt-in plugin for advanced SVG normalization (resolving CSS, flattening inheritance, converting shapes to paths).
+  - Verified WASM build stability and fixed issue 125 regarding `getrandom` backend.
+
+## 2026-02-09 - Whitespace Cleanup in Removal/Cleanup Plugins
+
+- Fixed whitespace/blank-line leftovers after removals in:
+  - `removeComments`
+  - `removeDoctype`
+  - `removeXMLProcInst`
+  - `removeViewBox`
+  - `cleanupEnableBackground`
+  - `cleanupAttrs`
+- `removeXMLProcInst` now also clears XML declaration metadata (`version`, `encoding`) when applicable.
+- `cleanupAttrs` now cleans namespace values (`xmlns*`) alongside normal attributes.
+- `removeComments` now applies runtime params via `configure()` and uses fixture macro with params.
+- Stringifier text escaping now emits `&apos;` and `&quot;` for text content to match fixture expectations.
+- Fixture loader now strips optional `===` description blocks in fixture sections before SVG parsing.
+
+## 2026-02-09 - usvg Plugin Integration
+
+- **NEW PLUGIN: `usvg`** — Opt-in SVG normalization via the usvg library (resvg project).
+  - Resolves CSS, flattens inheritance, converts shapes to paths, normalizes coordinates.
+  - Graceful error handling: logs warning and passes through original on failure.
+  - Configurable: `dpi`, `coordinatesPrecision`, `transformsPrecision`.
+  - Place first in plugin config array for correct ordering.
+- Fixed pre-existing `Cow` import bugs in `convert_one_stop_gradients.rs` and `convert_transform.rs` test modules.
+- Verified WASM build fix (issue 125) already applied — no additional changes needed.
+- Test results: 529 passed (+14 new), 31 pre-existing fixture diffs.
+
+## 2026-02-05 - librsvg Deprecation Cleanup (varia)
+
+- Updated `varia/svgccsvg.cpp` to use `rsvg_handle_get_intrinsic_size_in_pixels` and `rsvg_handle_render_document`.
+- Added `viewBox` fallback sizing, intrinsic-size failure handling, a `this_file` record, and tight-bounds rendering via ink extents with 1% padding.
+- Switched tool to stdin/stdout I/O (no fixed filenames).
+- Added stdin usage hint on empty input.
+- Disabled padding when intrinsic size or viewBox exists.
+- Verified build with `./svgccsvg.sh` (no warnings).
+
 ## 2026-02-04 - Parity Verification Attempt
 
 - Ran `target/release/vexy-svgo` on sample SVGs in `testdata/samples/`.

@@ -1,6 +1,7 @@
 // this_file: crates/core/src/parser/error.rs
 
 use std::fmt;
+
 use thiserror::Error;
 
 /// Parse error types
@@ -47,21 +48,21 @@ pub enum ParseError {
 #[derive(Debug, Clone)]
 pub struct DetailedParseError {
     /// File path (if available)
-    pub file_path: Option<String>,
+    pub file_path:   Option<String>,
     /// Line number (1-based)
-    pub line: usize,
+    pub line:        usize,
     /// Column number (1-based)
-    pub column: usize,
+    pub column:      usize,
     /// Byte offset in the source
     pub byte_offset: usize,
     /// Error message
-    pub message: String,
+    pub message:     String,
     /// Error severity level
-    pub severity: ErrorSeverity,
+    pub severity:    ErrorSeverity,
     /// Error category for better tooling integration
-    pub category: ErrorCategory,
+    pub category:    ErrorCategory,
     /// Source code context
-    pub context: Option<ErrorContext>,
+    pub context:     Option<ErrorContext>,
     /// Suggested fixes (if any)
     pub suggestions: Vec<String>,
 }
@@ -90,18 +91,18 @@ pub enum ErrorCategory {
 #[derive(Debug, Clone)]
 pub struct ErrorContext {
     /// Lines of source code around the error
-    pub lines: Vec<String>,
+    pub lines:            Vec<String>,
     /// Index of the error line in the lines vector
     pub error_line_index: usize,
     /// Column position in the error line
-    pub error_column: usize,
+    pub error_column:     usize,
 }
 
 impl fmt::Display for DetailedParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Format: severity: file.svg:line:column: category: error message
         write!(f, "{:?}: ", self.severity)?;
-        
+
         if let Some(ref path) = self.file_path {
             write!(f, "{path}:")?;
         }

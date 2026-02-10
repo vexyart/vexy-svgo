@@ -60,6 +60,7 @@ pub mod remove_xmlns;
 pub mod reuse_paths;
 pub mod sort_attrs;
 pub mod sort_defs_children;
+pub mod usvg;
 
 // Re-export plugins for easier access
 pub use add_attributes_to_svg_element::AddAttributesToSVGElementPlugin;
@@ -117,3 +118,4 @@ pub use remove_xmlns::RemoveXmlnsPlugin;
 pub use reuse_paths::ReusePathsPlugin;
 pub use sort_attrs::SortAttrsPlugin;
 pub use sort_defs_children::SortDefsChildrenPlugin;
+pub use usvg::UsvgPlugin;

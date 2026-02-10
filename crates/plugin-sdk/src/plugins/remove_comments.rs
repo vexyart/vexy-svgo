@@ -41,6 +41,46 @@ pub struct RemoveCommentsPlugin {
 }
 
 impl RemoveCommentsPlugin {
+    fn is_formatting_whitespace(text: &str) -> bool {
+        text.trim().is_empty() && text.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    }
+
+    fn cleanup_formatting_whitespace(nodes: &mut Vec<Node>) {
+        let has_non_whitespace_content = nodes.iter().any(|node| match node {
+            Node::Element(_) => true,
+            Node::Text(text) => !text.trim().is_empty(),
+            _ => false,
+        });
+
+        if has_non_whitespace_content {
+            nodes.retain(|node| {
+                !matches!(node, Node::Text(text) if Self::is_formatting_whitespace(text))
+            });
+        }
+    }
+
+    fn should_preserve_text_whitespace(element_name: &str) -> bool {
+        matches!(
+            element_name,
+            "text" | "tspan" | "tref" | "textPath" | "altGlyph"
+        )
+    }
+
+    fn normalize_text_children(element: &mut Element<'_>) {
+        let preserve = Self::should_preserve_text_whitespace(element.name.as_ref());
+        for child in &mut element.children {
+            if let Node::Text(text) = child {
+                if !preserve && (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        *text = trimmed.to_string().into();
+                    }
+                }
+            }
+        }
+        Self::cleanup_formatting_whitespace(&mut element.children);
+    }
+
     /// Create a new RemoveCommentsPlugin
     pub fn new() -> Self {
         Self {
@@ -81,26 +121,14 @@ impl RemoveCommentsPlugin {
             Node::Comment(comment) => self.should_keep_comment(comment),
             _ => true,
         });
+        Self::cleanup_formatting_whitespace(nodes);
     }
 
     /// Recursively remove comments from an element and its children
     fn remove_comments_recursive(&self, element: &mut Element) {
         // Remove comment nodes from children
         self.remove_comments_from_nodes(&mut element.children);
-
-        // Clean up whitespace-only text nodes if element now only has element children
-        let has_element_children = element.children.iter().any(|c| c.is_element());
-        let has_meaningful_text = element
-            .children
-            .iter()
-            .any(|c| matches!(c, Node::Text(text) if !text.trim().is_empty()));
-
-        if has_element_children && !has_meaningful_text {
-            // Remove whitespace-only text nodes
-            element
-                .children
-                .retain(|child| !matches!(child, Node::Text(text) if text.trim().is_empty()));
-        }
+        Self::normalize_text_children(element);
 
         // Recursively process child elements
         for child in &mut element.children {
@@ -128,6 +156,11 @@ impl Plugin for RemoveCommentsPlugin {
 
     fn validate_params(&self, params: &Value) -> Result<()> {
         Self::parse_config(params)?;
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
         Ok(())
     }
 
@@ -207,7 +240,7 @@ mod unit_tests {
     fn test_comment_preservation_logic() {
         let plugin = RemoveCommentsPlugin::new();
 
-        // Test comment preservation logic
+        // By default, legal comments are preserved
         assert!(plugin.should_keep_comment("! Legal comment"));
         assert!(plugin.should_keep_comment("!Important notice"));
         assert!(!plugin.should_keep_comment(" Regular comment"));
@@ -233,10 +266,10 @@ mod unit_tests {
         // Create SVG with comments
         let mut svg = create_element("svg");
         svg.children
-            .push(Node::Comment("Regular comment".to_string()));
+            .push(Node::Comment("Regular comment".to_string().into()));
         svg.children.push(Node::Element(create_element("rect")));
         svg.children
-            .push(Node::Comment("Another comment".to_string()));
+            .push(Node::Comment("Another comment".to_string().into()));
 
         doc.root = svg;
 
@@ -261,9 +294,9 @@ mod unit_tests {
         // Create SVG with legal and regular comments
         let mut svg = create_element("svg");
         svg.children
-            .push(Node::Comment("! Legal comment".to_string()));
+            .push(Node::Comment("! Legal comment".to_string().into()));
         svg.children
-            .push(Node::Comment("Regular comment".to_string()));
+            .push(Node::Comment("Regular comment".to_string().into()));
         svg.children.push(Node::Element(create_element("rect")));
 
         doc.root = svg;
@@ -274,7 +307,7 @@ mod unit_tests {
         // Check that legal comment was preserved
         assert_eq!(doc.root.children.len(), 2);
         if let Node::Comment(comment) = &doc.root.children[0] {
-            assert_eq!(comment, "! Legal comment");
+            assert_eq!(comment.as_ref(), "! Legal comment");
         }
         if let Node::Element(elem) = &doc.root.children[1] {
             assert_eq!(elem.name, "rect");
@@ -292,9 +325,9 @@ mod unit_tests {
         // Create SVG with legal and regular comments
         let mut svg = create_element("svg");
         svg.children
-            .push(Node::Comment("! Legal comment".to_string()));
+            .push(Node::Comment("! Legal comment".to_string().into()));
         svg.children
-            .push(Node::Comment("Regular comment".to_string()));
+            .push(Node::Comment("Regular comment".to_string().into()));
         svg.children.push(Node::Element(create_element("rect")));
 
         doc.root = svg;
@@ -316,12 +349,12 @@ mod unit_tests {
 
         // Create SVG with nested comments
         let mut svg = create_element("svg");
-        svg.children.push(Node::Comment("Root comment".to_string()));
+        svg.children.push(Node::Comment("Root comment".to_string().into()));
 
         let mut group = create_element("g");
         group
             .children
-            .push(Node::Comment("Group comment".to_string()));
+            .push(Node::Comment("Group comment".to_string().into()));
         group.children.push(Node::Element(create_element("rect")));
 
         svg.children.push(Node::Element(group));
@@ -349,14 +382,14 @@ mod unit_tests {
 
         // Add comments to prologue and epilogue
         doc.prologue
-            .push(Node::Comment("Prologue comment".to_string()));
+            .push(Node::Comment("Prologue comment".to_string().into()));
         doc.prologue
-            .push(Node::Comment("! Legal prologue".to_string()));
+            .push(Node::Comment("! Legal prologue".to_string().into()));
 
         doc.epilogue
-            .push(Node::Comment("Epilogue comment".to_string()));
+            .push(Node::Comment("Epilogue comment".to_string().into()));
         doc.epilogue
-            .push(Node::Comment("! Legal epilogue".to_string()));
+            .push(Node::Comment("! Legal epilogue".to_string().into()));
 
         let svg = create_element("svg");
         doc.root = svg;
@@ -367,12 +400,12 @@ mod unit_tests {
         // Check that only legal comments remain
         assert_eq!(doc.prologue.len(), 1);
         if let Node::Comment(comment) = &doc.prologue[0] {
-            assert_eq!(comment, "! Legal prologue");
+            assert_eq!(comment.as_ref(), "! Legal prologue");
         }
 
         assert_eq!(doc.epilogue.len(), 1);
         if let Node::Comment(comment) = &doc.epilogue[0] {
-            assert_eq!(comment, "! Legal epilogue");
+            assert_eq!(comment.as_ref(), "! Legal epilogue");
         }
     }
 
@@ -383,11 +416,11 @@ mod unit_tests {
 
         // Create SVG with comments and whitespace
         let mut svg = create_element("svg");
-        svg.children.push(Node::Text("\n    ".to_string()));
-        svg.children.push(Node::Comment("Comment".to_string()));
-        svg.children.push(Node::Text("\n    ".to_string()));
+        svg.children.push(Node::Text("\n    ".to_string().into()));
+        svg.children.push(Node::Comment("Comment".to_string().into()));
+        svg.children.push(Node::Text("\n    ".to_string().into()));
         svg.children.push(Node::Element(create_element("rect")));
-        svg.children.push(Node::Text("\n".to_string()));
+        svg.children.push(Node::Text("\n".to_string().into()));
 
         doc.root = svg;
 
@@ -409,11 +442,11 @@ mod unit_tests {
         // Create SVG with meaningful text
         let mut svg = create_element("svg");
         let mut text_elem = create_element("text");
-        text_elem.children.push(Node::Text("Hello".to_string()));
+        text_elem.children.push(Node::Text("Hello".to_string().into()));
         text_elem
             .children
-            .push(Node::Comment("Comment".to_string()));
-        text_elem.children.push(Node::Text(" World".to_string()));
+            .push(Node::Comment("Comment".to_string().into()));
+        text_elem.children.push(Node::Text(" World".to_string().into()));
 
         svg.children.push(Node::Element(text_elem));
 
@@ -427,10 +460,10 @@ mod unit_tests {
             assert_eq!(text_elem.name, "text");
             assert_eq!(text_elem.children.len(), 2);
             if let Node::Text(text) = &text_elem.children[0] {
-                assert_eq!(text, "Hello");
+                assert_eq!(text.as_ref(), "Hello");
             }
             if let Node::Text(text) = &text_elem.children[1] {
-                assert_eq!(text, " World");
+                assert_eq!(text.as_ref(), " World");
             }
         }
     }
@@ -453,4 +486,4 @@ mod unit_tests {
 }
 
 // Use parameterized testing framework for SVGO fixture tests
-crate::plugin_fixture_tests!(RemoveCommentsPlugin, "removeComments");
+crate::plugin_fixture_tests_with_params!(RemoveCommentsPlugin, "removeComments");

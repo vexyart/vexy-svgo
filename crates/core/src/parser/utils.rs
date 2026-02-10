@@ -22,7 +22,6 @@ pub fn calculate_line_and_column(input: &str, byte_pos: usize) -> (usize, usize)
     (line, col)
 }
 
-
 /// Create a detailed parse error with full context
 pub fn create_detailed_error_with_category(
     file_path: &Option<String>,

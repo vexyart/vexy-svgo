@@ -1,6 +1,8 @@
+// this_file: crates/benchmarks/benches/optimization.rs
+
 //! Performance benchmarks for vexy-svgo optimization
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use vexy_svgo_core::{optimize_default, optimize_with_config, Config};
 
 const SIMPLE_SVG: &str = r#"<svg width="100" height="100">
@@ -22,7 +24,7 @@ const MEDIUM_SVG: &str = r#"<svg width="500" height="500" viewBox="0 0 500 500">
     </g>
 </svg>"#;
 
-const COMPLEX_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+const COMPLEX_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
     <defs>
         <pattern id="pattern1" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
             <rect width="10" height="10" fill="#f0f0f0"/>
@@ -47,7 +49,7 @@ const COMPLEX_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="800"
     <text x="400" y="550" text-anchor="middle" font-family="Arial" font-size="30" fill="black">
         Complex SVG Example
     </text>
-</svg>"#;
+</svg>"##;
 
 fn bench_simple_svg(c: &mut Criterion) {
     c.bench_function("optimize_simple_svg", |b| {
@@ -78,7 +80,7 @@ fn bench_complex_svg(c: &mut Criterion) {
 
 fn bench_multipass(c: &mut Criterion) {
     let mut group = c.benchmark_group("multipass");
-    
+
     for passes in [false, true] {
         group.bench_with_input(
             BenchmarkId::from_parameter(if passes { "enabled" } else { "disabled" }),
@@ -86,7 +88,7 @@ fn bench_multipass(c: &mut Criterion) {
             |b, &passes| {
                 let mut config = Config::default();
                 config.multipass = passes;
-                
+
                 b.iter(|| {
                     let result = optimize_with_config(black_box(MEDIUM_SVG), config.clone());
                     assert!(result.is_ok());
@@ -99,7 +101,7 @@ fn bench_multipass(c: &mut Criterion) {
 
 fn bench_pretty_print(c: &mut Criterion) {
     let mut group = c.benchmark_group("pretty_print");
-    
+
     for pretty in [false, true] {
         group.bench_with_input(
             BenchmarkId::from_parameter(if pretty { "enabled" } else { "disabled" }),
@@ -107,7 +109,7 @@ fn bench_pretty_print(c: &mut Criterion) {
             |b, &pretty| {
                 let mut config = Config::default();
                 config.pretty = pretty;
-                
+
                 b.iter(|| {
                     let result = optimize_with_config(black_box(MEDIUM_SVG), config.clone());
                     assert!(result.is_ok());
@@ -123,14 +125,14 @@ fn bench_large_svg(c: &mut Criterion) {
     let mut large_svg = String::from(r#"<svg width="1000" height="1000">"#);
     for i in 0..1000 {
         large_svg.push_str(&format!(
-            r#"<rect x="{}" y="{}" width="10" height="10" fill="#{:06x}"/>"#,
+            r##"<rect x="{}" y="{}" width="10" height="10" fill="#{:06x}"/>"##,
             (i % 100) * 10,
             (i / 100) * 10,
             i * 1000
         ));
     }
     large_svg.push_str("</svg>");
-    
+
     c.bench_function("optimize_1000_elements", |b| {
         b.iter(|| {
             let result = optimize_default(black_box(&large_svg));
@@ -147,7 +149,7 @@ fn bench_path_optimization(c: &mut Criterion) {
         <path d="M 10.123456 70.987654 L 20.234567 80.876543 L 30.345678 70.765432"/>
         <path d="M 0 0 h 100 v 100 h -100 z"/>
     </svg>"#;
-    
+
     c.bench_function("optimize_path_heavy_svg", |b| {
         b.iter(|| {
             let result = optimize_default(black_box(path_heavy_svg));
@@ -159,78 +161,69 @@ fn bench_path_optimization(c: &mut Criterion) {
 #[cfg(feature = "parallel")]
 fn bench_parallel_processing(c: &mut Criterion) {
     use vexy_svgo_core::{optimize, OptimizeOptions};
-    use vexy_svgo_core::optimizer::parallel::ParallelConfig;
-    
+
     // Generate a very large SVG
     let mut huge_svg = String::from(r#"<svg width="2000" height="2000">"#);
     for i in 0..5000 {
         huge_svg.push_str(&format!(
-            r#"<g transform="translate({}, {})">
+            r##"<g transform="translate({}, {})">
                 <rect width="20" height="20" fill="#ff0000"/>
                 <circle cx="10" cy="10" r="5" fill="#00ff00"/>
                 <path d="M 0 0 L 20 20" stroke="#0000ff"/>
-            </g>"#,
+            </g>"##,
             (i % 100) * 20,
             (i / 100) * 20
         ));
     }
     huge_svg.push_str("</svg>");
-    
+
     let mut group = c.benchmark_group("parallel_processing");
     group.sample_size(10); // Reduce sample size for large benchmarks
-    
+
     // Sequential processing
     group.bench_function("sequential", |b| {
         let config = Config::default();
-        let options = OptimizeOptions::new(config);
-        
+
         b.iter(|| {
-            let result = optimize(black_box(&huge_svg), options.clone());
+            let options = OptimizeOptions::new(config.clone()).with_parallel(false);
+            let result = optimize(black_box(&huge_svg), options);
             assert!(result.is_ok());
         })
     });
-    
+
     // Parallel processing
     group.bench_function("parallel", |b| {
-        let config = Config::default();
-        let mut options = OptimizeOptions::new(config);
-        options.parallel = Some(ParallelConfig {
-            size_threshold: 1024,
-            element_threshold: 100,
-            num_threads: 4,
-        });
-        
+        let mut config = Config::default();
+        config.parallel = Some(4);
+
         b.iter(|| {
-            let result = optimize(black_box(&huge_svg), options.clone());
+            let options = OptimizeOptions::new(config.clone()).with_parallel(true);
+            let result = optimize(black_box(&huge_svg), options);
             assert!(result.is_ok());
         })
     });
-    
+
     group.finish();
 }
 
 fn bench_different_svg_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("svg_sizes");
-    
+
     for size in [10, 100, 500, 1000] {
         let mut svg = String::from(r#"<svg>"#);
         for i in 0..size {
             svg.push_str(&format!(r#"<rect x="{}" y="0" width="1" height="1"/>"#, i));
         }
         svg.push_str("</svg>");
-        
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}_elements", size)),
-            &svg,
-            |b, svg| {
-                b.iter(|| {
-                    let result = optimize_default(black_box(svg));
-                    assert!(result.is_ok());
-                })
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{}_elements", size)), &svg, |b, svg| {
+            b.iter(|| {
+                let result = optimize_default(black_box(svg));
+                assert!(result.is_ok());
+            })
+        });
     }
-    
+
     group.finish();
 }
 
@@ -247,10 +240,7 @@ criterion_group!(
 );
 
 #[cfg(feature = "parallel")]
-criterion_group!(
-    parallel_benches,
-    bench_parallel_processing,
-);
+criterion_group!(parallel_benches, bench_parallel_processing,);
 
 #[cfg(not(feature = "parallel"))]
 criterion_main!(benches);

@@ -14,9 +14,8 @@ pub mod enhanced;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_impl {
     use serde::{Deserialize, Serialize};
-    use wasm_bindgen::prelude::*;
-
     use vexy_svgo_core::{optimize_with_config, Config};
+    use wasm_bindgen::prelude::*;
 
     // When the `wasm` feature is enabled, use wee_alloc as the global allocator
     // to reduce WASM bundle size
@@ -45,15 +44,15 @@ pub mod wasm_impl {
     #[derive(Serialize, Deserialize)]
     pub struct JsConfig {
         /// Path to the SVG file (optional, used for error messages)
-        path: Option<String>,
+        path:          Option<String>,
         /// Multipass optimization (run until no changes)
         pub multipass: bool,
         /// Pretty print output
-        pub pretty: bool,
+        pub pretty:    bool,
         /// Indentation size for pretty printing
-        pub indent: u8,
+        pub indent:    u8,
         /// Plugins configuration as JSON string
-        plugins_json: String,
+        plugins_json:  String,
     }
 
     #[wasm_bindgen]
@@ -75,10 +74,10 @@ pub mod wasm_impl {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             Self {
-                path: None,
-                multipass: false,
-                pretty: false,
-                indent: 2,
+                path:         None,
+                multipass:    false,
+                pretty:       false,
+                indent:       2,
                 plugins_json: "{}".to_string(),
             }
         }
@@ -105,9 +104,9 @@ pub mod wasm_impl {
     /// JavaScript-friendly result object
     #[wasm_bindgen]
     pub struct JsOptimizationResult {
-        data: String,
-        error: Option<String>,
-        pub original_size: usize,
+        data:               String,
+        error:              Option<String>,
+        pub original_size:  usize,
         pub optimized_size: usize,
     }
 
@@ -156,7 +155,7 @@ pub mod wasm_impl {
 
     /// Main optimization function exposed to JavaScript
     #[wasm_bindgen]
-    pub fn optimize(svg: &str, config: Option<JsConfig>) -> Result<JsOptimizationResult, VexyError> {
+    pub fn optimize(svg: &str, config: Option<JsConfig>) -> Result<JsOptimizationResult, JsError> {
         let config = config.unwrap_or_default();
         let original_size = svg.len();
 
@@ -177,7 +176,7 @@ pub mod wasm_impl {
                             }
                         }
                     }
-                }
+                },
                 Err(e) => {
                     return Ok(JsOptimizationResult {
                         data: svg.to_string(),
@@ -185,7 +184,7 @@ pub mod wasm_impl {
                         original_size,
                         optimized_size: original_size,
                     });
-                }
+                },
             }
         }
 
@@ -208,7 +207,7 @@ pub mod wasm_impl {
 
     /// Optimize SVG with default configuration
     #[wasm_bindgen(js_name = optimizeDefault)]
-    pub fn optimize_default(svg: &str) -> Result<JsOptimizationResult, VexyError> {
+    pub fn optimize_default(svg: &str) -> Result<JsOptimizationResult, JsError> {
         optimize(svg, None)
     }
 
@@ -220,7 +219,7 @@ pub mod wasm_impl {
 
     /// Get list of available plugins
     #[wasm_bindgen(js_name = getPlugins)]
-    pub fn get_plugins() -> Result<String, VexyError> {
+    pub fn get_plugins() -> Result<String, JsError> {
         let config = Config::with_default_preset();
         let plugins: Vec<String> = config.plugins.iter().map(|p| p.name().to_string()).collect();
         serde_json::to_string(&plugins).map_err(|e| JsError::new(&e.to_string()))
@@ -228,7 +227,7 @@ pub mod wasm_impl {
 
     /// Get default preset configuration
     #[wasm_bindgen(js_name = getDefaultPreset)]
-    pub fn get_default_preset() -> Result<String, VexyError> {
+    pub fn get_default_preset() -> Result<String, JsError> {
         let config = Config::with_default_preset();
         serde_json::to_string(&config).map_err(|e| JsError::new(&e.to_string()))
     }
@@ -239,7 +238,7 @@ pub mod wasm_impl {
         svg: &str,
         config: Option<JsConfig>,
         chunk_size: usize,
-    ) -> Result<JsOptimizationResult, VexyError> {
+    ) -> Result<JsOptimizationResult, JsError> {
         // For now, just call the regular optimize function
         // In the future, this could be implemented to process large SVGs in chunks
         let _ = chunk_size; // Suppress unused warning
@@ -276,9 +275,9 @@ pub mod wasm_impl {
         #[test]
         fn test_optimization_result() {
             let result = JsOptimizationResult {
-                data: "optimized".to_string(),
-                error: None,
-                original_size: 100,
+                data:           "optimized".to_string(),
+                error:          None,
+                original_size:  100,
                 optimized_size: 50,
             };
 
@@ -290,8 +289,6 @@ pub mod wasm_impl {
 
 // Re-export the WASM functionality when targeting WASM
 #[cfg(target_arch = "wasm32")]
-
-
 #[cfg(target_arch = "wasm32")]
 pub use enhanced::*;
 

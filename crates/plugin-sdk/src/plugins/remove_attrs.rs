@@ -30,6 +30,32 @@ pub struct RemoveAttrsConfig {
     pub preserve_current_color: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RemoveAttrsConfigInput {
+    attrs: AttrPatterns,
+    #[serde(default)]
+    elem_separator: Option<String>,
+    #[serde(default)]
+    preserve_current_color: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum AttrPatterns {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl AttrPatterns {
+    fn into_vec(self) -> Vec<String> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(values) => values,
+        }
+    }
+}
+
 fn default_elem_separator() -> String {
     ":".to_string()
 }
@@ -134,8 +160,13 @@ impl RemoveAttrsPlugin {
 
         // Handle both object format and simple string/array format
         let config = if params.is_object() {
-            serde_json::from_value(params.clone())
-                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))?
+            let parsed: RemoveAttrsConfigInput = serde_json::from_value(params.clone())
+                .map_err(|e| anyhow::anyhow!("Invalid plugin configuration: {}", e))?;
+            RemoveAttrsConfig {
+                attrs: parsed.attrs.into_vec(),
+                elem_separator: parsed.elem_separator.unwrap_or_else(default_elem_separator),
+                preserve_current_color: parsed.preserve_current_color.unwrap_or(false),
+            }
         } else if let Some(attrs_str) = params.as_str() {
             RemoveAttrsConfig {
                 attrs: vec![attrs_str.to_string()],
@@ -226,6 +257,11 @@ impl Plugin for RemoveAttrsPlugin {
 
     fn validate_params(&self, params: &Value) -> Result<()> {
         Self::parse_config(params)?;
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
         Ok(())
     }
 

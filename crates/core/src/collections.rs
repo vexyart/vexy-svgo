@@ -2,8 +2,9 @@
 
 //! Collections of SVG-related constants and mappings
 
-use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
+
+use once_cell::sync::Lazy;
 
 pub static COLORS_NAMES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from([
@@ -327,15 +328,8 @@ pub static COLORS_PROPS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 });
 
 /// Animation elements in SVG
-pub static ANIMATION_ELEMS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    HashSet::from([
-        "animate",
-        "animateColor",
-        "animateMotion",
-        "animateTransform",
-        "set",
-    ])
-});
+pub static ANIMATION_ELEMS: Lazy<HashSet<&'static str>> =
+    Lazy::new(|| HashSet::from(["animate", "animateColor", "animateMotion", "animateTransform", "set"]));
 
 /// Inheritable attributes in SVG
 pub static INHERITABLE_ATTRS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
@@ -462,11 +456,8 @@ pub static ANIMATION_EVENT_ATTRS: Lazy<HashSet<&'static str>> =
     Lazy::new(|| HashSet::from(["onbegin", "onend", "onrepeat", "onload"]));
 
 /// Document event attributes in SVG
-pub static DOCUMENT_EVENT_ATTRS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    HashSet::from([
-        "onabort", "onerror", "onresize", "onscroll", "onunload", "onzoom",
-    ])
-});
+pub static DOCUMENT_EVENT_ATTRS: Lazy<HashSet<&'static str>> =
+    Lazy::new(|| HashSet::from(["onabort", "onerror", "onresize", "onscroll", "onunload", "onzoom"]));
 
 /// Document element event attributes in SVG
 pub static DOCUMENT_ELEMENT_EVENT_ATTRS: Lazy<HashSet<&'static str>> =

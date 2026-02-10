@@ -15,16 +15,16 @@ echo -e "${GREEN}[INFO]${NC} Building optimized WASM bundle..."
 cd "$(dirname "$0")"/..
 
 # Install wasm-pack if not available
-if ! command -v wasm-pack &> /dev/null; then
-    echo -e "${YELLOW}[WARN]${NC} wasm-pack not found. Installing..."
-    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+if ! command -v wasm-pack &>/dev/null; then
+	echo -e "${YELLOW}[WARN]${NC} wasm-pack not found. Installing..."
+	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 fi
 
 # Install wasm-opt if not available
-if ! command -v wasm-opt &> /dev/null; then
-    echo -e "${YELLOW}[WARN]${NC} wasm-opt not found. Please install binaryen for optimal size reduction."
-    echo "On macOS: brew install binaryen"
-    echo "On Ubuntu: apt-get install binaryen"
+if ! command -v wasm-opt &>/dev/null; then
+	echo -e "${YELLOW}[WARN]${NC} wasm-opt not found. Please install binaryen for optimal size reduction."
+	echo "On macOS: brew install binaryen"
+	echo "On Ubuntu: apt-get install binaryen"
 fi
 
 # Clean previous builds
@@ -36,57 +36,57 @@ echo -e "${GREEN}[INFO]${NC} Building WASM with aggressive size optimizations...
 cd crates/wasm
 
 # Build with the wasm profile
-RUSTFLAGS="-C opt-level=z -C lto=fat -C embed-bitcode=yes" \
-    wasm-pack build \
-    --target web \
-    --out-dir pkg \
-    --release \
-    --no-typescript \
-    -- \
-    --profile wasm \
-    --features size-optimization
+RUSTFLAGS="-C opt-level=z -C lto=fat -C embed-bitcode=yes --cfg getrandom_backend=\"wasm_js\"" \
+	wasm-pack build \
+	--target web \
+	--out-dir pkg \
+	--release \
+	--no-typescript \
+	-- \
+	--profile wasm \
+	--features size-optimization
 
 # Optimize with wasm-opt if available
-if command -v wasm-opt &> /dev/null; then
-    echo -e "${GREEN}[INFO]${NC} Running wasm-opt for additional size reduction..."
-    
-    # Get the original size
-    ORIGINAL_SIZE=$(stat -f%z pkg/vexy-svgo_bg.wasm 2>/dev/null || stat -c%s pkg/vexy-svgo_bg.wasm)
-    
-    # Run wasm-opt with aggressive optimizations
-    wasm-opt \
-        -Oz \
-        --enable-simd \
-        --enable-bulk-memory \
-        --enable-mutable-globals \
-        --enable-nontrapping-float-to-int \
-        --enable-sign-ext \
-        --precompute-propagate \
-        --dce \
-        --vacuum \
-        --strip-debug \
-        --strip-producers \
-        pkg/vexy-svgo_bg.wasm \
-        -o pkg/vexy-svgo_bg_opt.wasm
-    
-    # Replace original with optimized version
-    mv pkg/vexy-svgo_bg_opt.wasm pkg/vexy-svgo_bg.wasm
-    
-    # Get the optimized size
-    OPTIMIZED_SIZE=$(stat -f%z pkg/vexy-svgo_bg.wasm 2>/dev/null || stat -c%s pkg/vexy-svgo_bg.wasm)
-    
-    # Calculate reduction
-    REDUCTION=$((ORIGINAL_SIZE - OPTIMIZED_SIZE))
-    PERCENTAGE=$((REDUCTION * 100 / ORIGINAL_SIZE))
-    
-    echo -e "${GREEN}[INFO]${NC} Size reduction: ${REDUCTION} bytes (${PERCENTAGE}%)"
-    echo -e "${GREEN}[INFO]${NC} Original: ${ORIGINAL_SIZE} bytes"
-    echo -e "${GREEN}[INFO]${NC} Optimized: ${OPTIMIZED_SIZE} bytes"
+if command -v wasm-opt &>/dev/null; then
+	echo -e "${GREEN}[INFO]${NC} Running wasm-opt for additional size reduction..."
+
+	# Get the original size
+	ORIGINAL_SIZE=$(stat -f%z pkg/vexy-svgo_bg.wasm 2>/dev/null || stat -c%s pkg/vexy-svgo_bg.wasm)
+
+	# Run wasm-opt with aggressive optimizations
+	wasm-opt \
+		-Oz \
+		--enable-simd \
+		--enable-bulk-memory \
+		--enable-mutable-globals \
+		--enable-nontrapping-float-to-int \
+		--enable-sign-ext \
+		--precompute-propagate \
+		--dce \
+		--vacuum \
+		--strip-debug \
+		--strip-producers \
+		pkg/vexy-svgo_bg.wasm \
+		-o pkg/vexy-svgo_bg_opt.wasm
+
+	# Replace original with optimized version
+	mv pkg/vexy-svgo_bg_opt.wasm pkg/vexy-svgo_bg.wasm
+
+	# Get the optimized size
+	OPTIMIZED_SIZE=$(stat -f%z pkg/vexy-svgo_bg.wasm 2>/dev/null || stat -c%s pkg/vexy-svgo_bg.wasm)
+
+	# Calculate reduction
+	REDUCTION=$((ORIGINAL_SIZE - OPTIMIZED_SIZE))
+	PERCENTAGE=$((REDUCTION * 100 / ORIGINAL_SIZE))
+
+	echo -e "${GREEN}[INFO]${NC} Size reduction: ${REDUCTION} bytes (${PERCENTAGE}%)"
+	echo -e "${GREEN}[INFO]${NC} Original: ${ORIGINAL_SIZE} bytes"
+	echo -e "${GREEN}[INFO]${NC} Optimized: ${OPTIMIZED_SIZE} bytes"
 fi
 
 # Generate minimal glue code
 echo -e "${GREEN}[INFO]${NC} Generating minimal JavaScript glue code..."
-cat > pkg/vexy-svgo_minimal.js << 'EOF'
+cat >pkg/vexy-svgo_minimal.js <<'EOF'
 // Minimal WASM loader for vexy-svgo
 export async function initVexySvgo(wasmPath) {
     const response = await fetch(wasmPath);
@@ -142,7 +142,7 @@ EOF
 
 # Create size report
 echo -e "${GREEN}[INFO]${NC} Creating size report..."
-cat > pkg/size-report.txt << EOF
+cat >pkg/size-report.txt <<EOF
 WASM Bundle Size Report
 ======================
 Date: $(date)
@@ -155,22 +155,22 @@ EOF
 
 # Add file sizes to report
 for file in pkg/*.{wasm,js}; do
-    if [ -f "$file" ]; then
-        SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file")
-        printf "%-30s %10d bytes\n" "$(basename $file):" "$SIZE" >> pkg/size-report.txt
-    fi
+	if [ -f "$file" ]; then
+		SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file")
+		printf "%-30s %10d bytes\n" "$(basename $file):" "$SIZE" >>pkg/size-report.txt
+	fi
 done
 
 # Add gzipped sizes
-echo -e "\nGzipped Sizes:" >> pkg/size-report.txt
-echo "--------------" >> pkg/size-report.txt
+echo -e "\nGzipped Sizes:" >>pkg/size-report.txt
+echo "--------------" >>pkg/size-report.txt
 for file in pkg/*.{wasm,js}; do
-    if [ -f "$file" ]; then
-        gzip -c "$file" > "$file.gz"
-        SIZE=$(stat -f%z "$file.gz" 2>/dev/null || stat -c%s "$file.gz")
-        printf "%-30s %10d bytes\n" "$(basename $file).gz:" "$SIZE" >> pkg/size-report.txt
-        rm "$file.gz"
-    fi
+	if [ -f "$file" ]; then
+		gzip -c "$file" >"$file.gz"
+		SIZE=$(stat -f%z "$file.gz" 2>/dev/null || stat -c%s "$file.gz")
+		printf "%-30s %10d bytes\n" "$(basename $file).gz:" "$SIZE" >>pkg/size-report.txt
+		rm "$file.gz"
+	fi
 done
 
 echo -e "${GREEN}[INFO]${NC} Size report saved to pkg/size-report.txt"

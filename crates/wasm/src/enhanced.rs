@@ -9,23 +9,19 @@
 //! - Performance metrics
 //! - Memory management utilities
 
-use wasm_bindgen::prelude::*;
 use std::collections::HashMap;
 
-use vexy_svgo_core::{
-    Config, PluginConfig,
-    optimize_with_config, parse_svg,
-    features::{Feature, enable_feature, is_feature_enabled},
-    create_default_registry,
-};
+use vexy_svgo_core::features::{enable_feature, is_feature_enabled, Feature};
+use vexy_svgo_core::{create_default_registry, optimize_with_config, parse_svg, Config, PluginConfig};
+use wasm_bindgen::prelude::*;
 
 /// Advanced configuration with full control over optimization
 #[wasm_bindgen]
 pub struct EnhancedConfig {
-    inner: Config,
-    plugin_params: HashMap<String, serde_json::Value>,
+    inner:            Config,
+    plugin_params:    HashMap<String, serde_json::Value>,
     performance_mode: PerformanceMode,
-    error_handling: ErrorHandlingMode,
+    error_handling:   ErrorHandlingMode,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -54,19 +50,19 @@ impl EnhancedConfig {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
-            inner: Config::with_default_preset(),
-            plugin_params: HashMap::new(),
+            inner:            Config::with_default_preset(),
+            plugin_params:    HashMap::new(),
             performance_mode: PerformanceMode::Balanced,
-            error_handling: ErrorHandlingMode::Lenient,
+            error_handling:   ErrorHandlingMode::Lenient,
         }
     }
 
     /// Create configuration from JSON
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<EnhancedConfig, VexyError> {
-        let inner: Config = serde_json::from_str(json)
-            .map_err(|e| JsError::new(&format!("Invalid config JSON: {}", e)))?;
-        
+    pub fn from_json(json: &str) -> Result<EnhancedConfig, JsError> {
+        let inner: Config =
+            serde_json::from_str(json).map_err(|e| JsError::new(&format!("Invalid config JSON: {}", e)))?;
+
         Ok(Self {
             inner,
             plugin_params: HashMap::new(),
@@ -77,7 +73,7 @@ impl EnhancedConfig {
 
     /// Export configuration to JSON
     #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, VexyError> {
+    pub fn to_json(&self) -> Result<String, JsError> {
         serde_json::to_string_pretty(&self.inner)
             .map_err(|e| JsError::new(&format!("Failed to serialize config: {}", e)))
     }
@@ -106,8 +102,6 @@ impl EnhancedConfig {
         self.inner.js2svg.pretty
     }
 
-    
-
     /// Enable or disable a specific plugin
     #[wasm_bindgen(js_name = setPluginEnabled)]
     pub fn set_plugin_enabled(&mut self, name: &str, enabled: bool) {
@@ -116,19 +110,19 @@ impl EnhancedConfig {
 
     /// Configure a plugin with parameters
     #[wasm_bindgen(js_name = configurePlugin)]
-    pub fn configure_plugin(&mut self, name: &str, params_json: &str) -> Result<(), VexyError> {
-        let params: serde_json::Value = serde_json::from_str(params_json)
-            .map_err(|e| JsError::new(&format!("Invalid plugin params: {}", e)))?;
-        
+    pub fn configure_plugin(&mut self, name: &str, params_json: &str) -> Result<(), JsError> {
+        let params: serde_json::Value =
+            serde_json::from_str(params_json).map_err(|e| JsError::new(&format!("Invalid plugin params: {}", e)))?;
+
         self.plugin_params.insert(name.to_string(), params.clone());
-        
+
         // Update the plugin configuration
         self.inner.plugins.retain(|p| p.name() != name);
         self.inner.plugins.push(PluginConfig::WithParams {
-            name: name.to_string(),
+            name:   name.to_string(),
             params: params.clone(),
         });
-        
+
         Ok(())
     }
 
@@ -156,12 +150,12 @@ impl EnhancedConfig {
 /// Detailed optimization result with metrics
 #[wasm_bindgen]
 pub struct EnhancedResult {
-    data: String,
-    original_size: usize,
+    data:           String,
+    original_size:  usize,
     optimized_size: usize,
-    errors: Vec<String>,
-    warnings: Vec<String>,
-    metrics: PerformanceMetrics,
+    errors:         Vec<String>,
+    warnings:       Vec<String>,
+    metrics:        PerformanceMetrics,
 }
 
 #[wasm_bindgen]
@@ -229,23 +223,23 @@ impl EnhancedResult {
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct PerformanceMetrics {
-    pub parse_time_ms: f64,
-    pub optimize_time_ms: f64,
-    pub stringify_time_ms: f64,
-    pub total_time_ms: f64,
-    pub plugins_applied: u32,
+    pub parse_time_ms:       f64,
+    pub optimize_time_ms:    f64,
+    pub stringify_time_ms:   f64,
+    pub total_time_ms:       f64,
+    pub plugins_applied:     u32,
     pub optimization_passes: u32,
-    pub elements_processed: u32,
-    pub memory_peak_kb: f64,
+    pub elements_processed:  u32,
+    pub memory_peak_kb:      f64,
 }
 
 /// Plugin information
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct PluginInfo {
-    name: String,
-    description: String,
-    enabled: bool,
+    name:         String,
+    description:  String,
+    enabled:      bool,
     configurable: bool,
 }
 
@@ -261,8 +255,6 @@ impl PluginInfo {
         self.description.clone()
     }
 
-    
-
     #[wasm_bindgen(getter)]
     pub fn enabled(&self) -> bool {
         self.enabled
@@ -276,22 +268,16 @@ impl PluginInfo {
 
 /// Enhanced optimization with detailed metrics
 #[wasm_bindgen(js_name = optimizeEnhanced)]
-pub fn optimize_enhanced(svg: &str, config: EnhancedConfig) -> Result<EnhancedResult, VexyError> {
-    let start_time = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now())
-        .unwrap_or(0.0);
-    
+pub fn optimize_enhanced(svg: &str, config: EnhancedConfig) -> Result<EnhancedResult, JsError> {
+    let start_time = web_sys::window().and_then(|w| w.performance()).map(|p| p.now()).unwrap_or(0.0);
+
     let original_size = svg.len();
     let mut errors = Vec::new();
     let warnings = Vec::new();
-    
+
     // Parse timing
-    let parse_start = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now())
-        .unwrap_or(0.0);
-    
+    let parse_start = web_sys::window().and_then(|w| w.performance()).map(|p| p.now()).unwrap_or(0.0);
+
     let _document = match parse_svg(svg) {
         Ok(doc) => doc,
         Err(e) => {
@@ -303,30 +289,24 @@ pub fn optimize_enhanced(svg: &str, config: EnhancedConfig) -> Result<EnhancedRe
                 errors,
                 warnings,
                 metrics: PerformanceMetrics {
-                    parse_time_ms: 0.0,
-                    optimize_time_ms: 0.0,
-                    stringify_time_ms: 0.0,
-                    total_time_ms: 0.0,
-                    plugins_applied: 0,
+                    parse_time_ms:       0.0,
+                    optimize_time_ms:    0.0,
+                    stringify_time_ms:   0.0,
+                    total_time_ms:       0.0,
+                    plugins_applied:     0,
                     optimization_passes: 0,
-                    elements_processed: 0,
-                    memory_peak_kb: 0.0,
+                    elements_processed:  0,
+                    memory_peak_kb:      0.0,
                 },
             });
-        }
+        },
     };
-    
-    let parse_time = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now() - parse_start)
-        .unwrap_or(0.0);
-    
+
+    let parse_time = web_sys::window().and_then(|w| w.performance()).map(|p| p.now() - parse_start).unwrap_or(0.0);
+
     // Optimize timing
-    let optimize_start = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now())
-        .unwrap_or(0.0);
-    
+    let optimize_start = web_sys::window().and_then(|w| w.performance()).map(|p| p.now()).unwrap_or(0.0);
+
     let result = match optimize_with_config(svg, config.inner.clone()) {
         Ok(res) => res,
         Err(e) => {
@@ -338,29 +318,24 @@ pub fn optimize_enhanced(svg: &str, config: EnhancedConfig) -> Result<EnhancedRe
                 errors,
                 warnings,
                 metrics: PerformanceMetrics {
-                    parse_time_ms: parse_time,
-                    optimize_time_ms: 0.0,
-                    stringify_time_ms: 0.0,
-                    total_time_ms: parse_time,
-                    plugins_applied: 0,
+                    parse_time_ms:       parse_time,
+                    optimize_time_ms:    0.0,
+                    stringify_time_ms:   0.0,
+                    total_time_ms:       parse_time,
+                    plugins_applied:     0,
                     optimization_passes: 0,
-                    elements_processed: 0,
-                    memory_peak_kb: 0.0,
+                    elements_processed:  0,
+                    memory_peak_kb:      0.0,
                 },
             });
-        }
+        },
     };
-    
-    let optimize_time = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now() - optimize_start)
-        .unwrap_or(0.0);
-    
-    let total_time = web_sys::window()
-        .and_then(|w| w.performance())
-        .map(|p| p.now() - start_time)
-        .unwrap_or(0.0);
-    
+
+    let optimize_time =
+        web_sys::window().and_then(|w| w.performance()).map(|p| p.now() - optimize_start).unwrap_or(0.0);
+
+    let total_time = web_sys::window().and_then(|w| w.performance()).map(|p| p.now() - start_time).unwrap_or(0.0);
+
     Ok(EnhancedResult {
         data: result.data.clone(),
         original_size,
@@ -368,21 +343,21 @@ pub fn optimize_enhanced(svg: &str, config: EnhancedConfig) -> Result<EnhancedRe
         errors,
         warnings,
         metrics: PerformanceMetrics {
-            parse_time_ms: parse_time,
-            optimize_time_ms: optimize_time,
-            stringify_time_ms: 0.0, // Not separately measured in current implementation
-            total_time_ms: total_time,
-            plugins_applied: config.inner.plugins.len() as u32,
+            parse_time_ms:       parse_time,
+            optimize_time_ms:    optimize_time,
+            stringify_time_ms:   0.0, // Not separately measured in current implementation
+            total_time_ms:       total_time,
+            plugins_applied:     config.inner.plugins.len() as u32,
             optimization_passes: if config.inner.multipass { 2 } else { 1 },
-            elements_processed: 0, // Would need to count during optimization
-            memory_peak_kb: 0.0, // WebAssembly doesn't provide easy memory profiling
+            elements_processed:  0,   // Would need to count during optimization
+            memory_peak_kb:      0.0, // WebAssembly doesn't provide easy memory profiling
         },
     })
 }
 
 /// Get list of available plugins with metadata
 #[wasm_bindgen(js_name = getPluginsWithMetadata)]
-pub fn get_plugins() -> Result<Vec<JsValue>, VexyError> {
+pub fn get_plugins() -> Result<Vec<JsValue>, JsError> {
     let registry = create_default_registry();
     let plugins: Vec<JsValue> = registry
         .plugin_names()
@@ -390,16 +365,16 @@ pub fn get_plugins() -> Result<Vec<JsValue>, VexyError> {
         .filter_map(|name| registry.create_plugin(name))
         .map(|plugin| {
             let info = PluginInfo {
-                name: plugin.name().to_string(),
+                name:        plugin.name().to_string(),
                 description: plugin.description().to_string(),
-                
-                enabled: true, // Default enabled status
+
+                enabled:      true, // Default enabled status
                 configurable: true, // Most plugins are configurable
             };
             JsValue::from(info)
         })
         .collect();
-    
+
     Ok(plugins)
 }
 
@@ -408,7 +383,7 @@ pub fn get_plugins() -> Result<Vec<JsValue>, VexyError> {
 pub struct StreamingOptimizer {
     config: EnhancedConfig,
     buffer: String,
-    state: StreamingState,
+    state:  StreamingState,
 }
 
 #[derive(Clone)]
@@ -433,25 +408,21 @@ impl StreamingOptimizer {
 
     /// Add a chunk of SVG data
     #[wasm_bindgen(js_name = addChunk)]
-    pub fn add_chunk(&mut self, chunk: &str) -> Result<(), VexyError> {
+    pub fn add_chunk(&mut self, chunk: &str) -> Result<(), JsError> {
         match &self.state {
             StreamingState::Ready | StreamingState::Processing => {
                 self.buffer.push_str(chunk);
                 self.state = StreamingState::Processing;
                 Ok(())
-            }
-            StreamingState::Complete => {
-                Err(JsError::new("Optimization already complete"))
-            }
-            StreamingState::Error(e) => {
-                Err(JsError::new(&format!("Optimizer in error state: {}", e)))
-            }
+            },
+            StreamingState::Complete => Err(JsError::new("Optimization already complete")),
+            StreamingState::Error(e) => Err(JsError::new(&format!("Optimizer in error state: {}", e))),
         }
     }
 
     /// Finalize and get the optimized result
     #[wasm_bindgen(js_name = finalize)]
-    pub fn finalize(&mut self) -> Result<EnhancedResult, VexyError> {
+    pub fn finalize(&mut self) -> Result<EnhancedResult, JsError> {
         match &self.state {
             StreamingState::Processing => {
                 match optimize_enhanced(&self.buffer, self.config.clone()) {
@@ -459,23 +430,17 @@ impl StreamingOptimizer {
                         self.state = StreamingState::Complete;
                         self.buffer.clear(); // Free memory
                         Ok(result)
-                    }
+                    },
                     Err(e) => {
                         self.state = StreamingState::Error(format!("{:?}", e));
                         self.buffer.clear(); // Free memory
                         Err(e)
-                    }
+                    },
                 }
-            }
-            StreamingState::Ready => {
-                Err(JsError::new("No data to optimize"))
-            }
-            StreamingState::Complete => {
-                Err(JsError::new("Already finalized"))
-            }
-            StreamingState::Error(e) => {
-                Err(JsError::new(&format!("Optimizer in error state: {}", e)))
-            }
+            },
+            StreamingState::Ready => Err(JsError::new("No data to optimize")),
+            StreamingState::Complete => Err(JsError::new("Already finalized")),
+            StreamingState::Error(e) => Err(JsError::new(&format!("Optimizer in error state: {}", e))),
         }
     }
 
@@ -495,7 +460,7 @@ impl StreamingOptimizer {
 
 /// Feature management
 #[wasm_bindgen(js_name = enableFeature)]
-pub fn enable_wasm_feature(feature_name: &str) -> Result<(), VexyError> {
+pub fn enable_wasm_feature(feature_name: &str) -> Result<(), JsError> {
     let feature = match feature_name {
         "parallel" => Feature::ParallelProcessing,
         "streaming" => Feature::StreamingParser,
@@ -507,9 +472,8 @@ pub fn enable_wasm_feature(feature_name: &str) -> Result<(), VexyError> {
         "memory_profiling" => Feature::MemoryProfiling,
         _ => return Err(JsError::new(&format!("Unknown feature: {}", feature_name))),
     };
-    
-    enable_feature(feature)
-        .map_err(|e| JsError::new(&format!("Failed to enable feature: {}", e)))
+
+    enable_feature(feature).map_err(|e| JsError::new(&format!("Failed to enable feature: {}", e)))
 }
 
 /// Check if a feature is enabled
@@ -526,7 +490,7 @@ pub fn is_wasm_feature_enabled(feature_name: &str) -> bool {
         "memory_profiling" => Feature::MemoryProfiling,
         _ => return false,
     };
-    
+
     is_feature_enabled(feature)
 }
 
@@ -547,19 +511,19 @@ pub fn get_available_features() -> Vec<JsValue> {
 
 /// Validate SVG without optimization
 #[wasm_bindgen(js_name = validateSvg)]
-pub fn validate_svg(svg: &str) -> Result<ValidationResult, VexyError> {
+pub fn validate_svg(svg: &str) -> Result<ValidationResult, JsError> {
     match parse_svg(svg) {
         Ok(_doc) => {
             let mut issues = Vec::new();
-            
+
             // Basic validation checks
             if !svg.trim().starts_with('<') {
                 issues.push("SVG should start with '<'".to_string());
             }
-            
+
             // Count elements (simplified)
             let element_count = svg.matches('<').count();
-            
+
             Ok(ValidationResult {
                 valid: issues.is_empty(),
                 issues,
@@ -567,26 +531,24 @@ pub fn validate_svg(svg: &str) -> Result<ValidationResult, VexyError> {
                 has_viewbox: svg.contains("viewBox"),
                 has_namespace: svg.contains("xmlns"),
             })
-        }
-        Err(e) => {
-            Ok(ValidationResult {
-                valid: false,
-                issues: vec![format!("Parse error: {}", e)],
-                element_count: 0,
-                has_viewbox: false,
-                has_namespace: false,
-            })
-        }
+        },
+        Err(e) => Ok(ValidationResult {
+            valid:         false,
+            issues:        vec![format!("Parse error: {}", e)],
+            element_count: 0,
+            has_viewbox:   false,
+            has_namespace: false,
+        }),
     }
 }
 
 /// SVG validation result
 #[wasm_bindgen]
 pub struct ValidationResult {
-    valid: bool,
-    issues: Vec<String>,
+    valid:         bool,
+    issues:        Vec<String>,
     element_count: u32,
-    has_viewbox: bool,
+    has_viewbox:   bool,
     has_namespace: bool,
 }
 
@@ -624,27 +586,27 @@ pub fn get_memory_usage() -> MemoryInfo {
     // WebAssembly.Memory provides buffer info but not detailed usage
     // This is a simplified version
     MemoryInfo {
-        used_kb: 0.0, // Would need runtime support
+        used_kb:  0.0, // Would need runtime support
         total_kb: 0.0,
-        peak_kb: 0.0,
+        peak_kb:  0.0,
     }
 }
 
 #[wasm_bindgen]
 pub struct MemoryInfo {
-    pub used_kb: f64,
+    pub used_kb:  f64,
     pub total_kb: f64,
-    pub peak_kb: f64,
+    pub peak_kb:  f64,
 }
 
 // Implement Clone for EnhancedConfig manually since HashMap doesn't auto-derive
 impl Clone for EnhancedConfig {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
-            plugin_params: self.plugin_params.clone(),
+            inner:            self.inner.clone(),
+            plugin_params:    self.plugin_params.clone(),
             performance_mode: self.performance_mode,
-            error_handling: self.error_handling,
+            error_handling:   self.error_handling,
         }
     }
 }

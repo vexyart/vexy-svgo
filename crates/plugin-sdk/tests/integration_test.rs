@@ -13,10 +13,10 @@ fn test_remove_comments_plugin_integration() {
     // Add some children to the root element to test comment removal
     doc.root
         .children
-        .push(Node::Comment("Regular comment".to_string()));
+        .push(Node::Comment("Regular comment".to_string().into_boxed_str()));
     doc.root
         .children
-        .push(Node::Comment("! Legal comment".to_string()));
+        .push(Node::Comment("! Legal comment".to_string().into_boxed_str()));
     doc.root.children.push(Node::Element(Element::new("rect")));
 
     // Create the plugin
@@ -55,10 +55,10 @@ fn test_remove_comments_without_preserve_patterns() {
 
     doc.root
         .children
-        .push(Node::Comment("Regular comment".to_string()));
+        .push(Node::Comment("Regular comment".to_string().into_boxed_str()));
     doc.root
         .children
-        .push(Node::Comment("! Legal comment".to_string()));
+        .push(Node::Comment("! Legal comment".to_string().into_boxed_str()));
     doc.root.children.push(Node::Element(Element::new("rect")));
 
     // Create plugin with preserve_patterns disabled

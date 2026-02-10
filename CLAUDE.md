@@ -1,5 +1,7 @@
 # Development guidelines
 
+ULTRAWORK: Deploy a team of 3 agents: Teammate 1 is the Supervisor who analyzes, plans, coordinates, orchestrates the next steps & delegates the work; Teammate 2 is the Coder who implements changes in the code; Teammate 3 is the Tester who examines, tests, verifies, debugs, and who reports to Supervisor; repeat until all tasks are completed & the app is highly polished & well-developed. 
+
 ## Foundation: Challenge your first instinct with chain-of-thought
 
 Before you generate any response, assume your first instinct is wrong. Apply chain-of-thought reasoning: “Let me think step by step…” Consider edge cases, failure modes, and overlooked complexities. Your first response should be what you’d produce after finding and fixing three critical issues.

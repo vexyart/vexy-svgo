@@ -76,7 +76,7 @@ pub(crate) fn find_references(attr_name: &str, attr_value: &str) -> Vec<String> 
     let mut ids = Vec::new();
 
     // Check href attributes
-    if attr_name == "href" || attr_name == "xlink:href" {
+    if attr_name == "href" || attr_name.ends_with(":href") {
         if let Some(captures) = REG_REFERENCES_HREF.captures(attr_value) {
             if let Some(id) = captures.get(1) {
                 ids.push(id.as_str().to_string());
@@ -151,6 +151,18 @@ pub(crate) fn update_reference_value(value: &str, id_mappings: &HashMap<String, 
                     let full_match = &caps[0];
                     let quote = if full_match.contains('"') { '"' } else { '\'' };
                     return format!("url({}#{}{})", quote, new_id, quote);
+                }
+            }
+            caps[0].to_string()
+        })
+        .to_string();
+
+    // Update begin="id.event" references.
+    result = REG_REFERENCES_BEGIN
+        .replace_all(&result, |caps: &regex::Captures| {
+            if let Some(id) = caps.get(1) {
+                if let Some(new_id) = id_mappings.get(id.as_str()) {
+                    return caps[0].replacen(id.as_str(), new_id, 1);
                 }
             }
             caps[0].to_string()

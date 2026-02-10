@@ -144,6 +144,7 @@ mod tests {
             },
             epilogue: vec![],
             metadata: DocumentMetadata::default(),
+            memory_budget: None,
         }
     }
 

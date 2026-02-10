@@ -32,7 +32,7 @@ impl Default for CleanupNumericValuesParams {
     fn default() -> Self {
         Self {
             float_precision: 3,
-            leading_zero: true,
+            leading_zero: false,
             default_px: true,
             convert_to_px: true,
         }
@@ -57,6 +57,15 @@ impl CleanupNumericValuesPlugin {
     pub fn with_params(params: CleanupNumericValuesParams) -> Self {
         Self { params }
     }
+
+    fn parse_params(params: &serde_json::Value) -> anyhow::Result<CleanupNumericValuesParams> {
+        if params.is_null() {
+            return Ok(CleanupNumericValuesParams::default());
+        }
+
+        serde_json::from_value::<CleanupNumericValuesParams>(params.clone())
+            .map_err(|e| anyhow::anyhow!("Invalid parameters: {}", e))
+    }
 }
 
 impl Plugin for CleanupNumericValuesPlugin {
@@ -69,9 +78,12 @@ impl Plugin for CleanupNumericValuesPlugin {
     }
 
     fn validate_params(&self, params: &serde_json::Value) -> anyhow::Result<()> {
-        // Try to deserialize the params to validate their structure
-        serde_json::from_value::<CleanupNumericValuesParams>(params.clone())
-            .map_err(|e| anyhow::anyhow!("Invalid parameters: {}", e))?;
+        let _ = Self::parse_params(params)?;
+        Ok(())
+    }
+
+    fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
+        self.params = Self::parse_params(params)?;
         Ok(())
     }
 
@@ -136,6 +148,20 @@ impl CleanupNumericValuesVisitor {
             return self.optimize_transform_value(value);
         }
 
+        if attribute_name == "viewBox" {
+            return value
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .filter(|token| !token.is_empty())
+                .map(|token| {
+                    token
+                        .parse::<f64>()
+                        .map(|num| self.round_numeric_value(num))
+                        .unwrap_or_else(|_| token.to_string())
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+        }
+
         // For other attributes, use the general numeric pattern
         NUMERIC_PATTERN.replace_all(value, |caps: &regex::Captures| {
             let number_str = &caps[1];
@@ -148,6 +174,15 @@ impl CleanupNumericValuesVisitor {
                 if unit == "px" && self.params.default_px && self.is_default_px_context(attribute_name) {
                     // Remove px unit when it's the default
                     rounded
+                } else if !unit.is_empty()
+                    && self.params.convert_to_px
+                    && self.is_default_px_context(attribute_name)
+                {
+                    if let Some(px_value) = self.convert_unit_to_px(num, unit) {
+                        self.round_numeric_value(px_value)
+                    } else {
+                        format!("{}{}", rounded, unit)
+                    }
                 } else if !unit.is_empty() {
                     // Keep the unit
                     format!("{}{}", rounded, unit)
@@ -184,6 +219,20 @@ impl CleanupNumericValuesVisitor {
             "font-size" | "letter-spacing" | "word-spacing" |
             "baseline-shift"
         )
+    }
+
+    fn convert_unit_to_px(&self, value: f64, unit: &str) -> Option<f64> {
+        let px_value = match unit {
+            "px" => value,
+            "pt" => value * (96.0 / 72.0),
+            "pc" => value * 16.0,
+            "mm" => value * (96.0 / 25.4),
+            "cm" => value * (96.0 / 2.54),
+            "in" => value * 96.0,
+            _ => return None,
+        };
+
+        Some(px_value)
     }
 
     fn should_process_attribute(&self, name: &str) -> bool {
@@ -277,7 +326,7 @@ mod unit_tests {
         let plugin = CleanupNumericValuesPlugin::new();
         assert_eq!(plugin.name(), "cleanupNumericValues");
         assert_eq!(plugin.params.float_precision, 3);
-        assert!(plugin.params.leading_zero);
+        assert!(!plugin.params.leading_zero);
         assert!(plugin.params.default_px);
         assert!(plugin.params.convert_to_px);
     }
@@ -313,7 +362,7 @@ mod unit_tests {
         // Test basic rounding
         assert_eq!(visitor.round_numeric_value(1.23456), "1.235");
         assert_eq!(visitor.round_numeric_value(1.0), "1");
-        assert_eq!(visitor.round_numeric_value(0.5), "0.5");
+        assert_eq!(visitor.round_numeric_value(0.5), ".5");
         assert_eq!(visitor.round_numeric_value(-1.23456), "-1.235");
 
         // Test without leading zero
@@ -371,7 +420,7 @@ mod unit_tests {
         
         assert_eq!(
             visitor.process_style_value("opacity: 0.50000; fill: red"),
-            "opacity: 0.5; fill: red"
+            "opacity: .5; fill: red"
         );
     }
 

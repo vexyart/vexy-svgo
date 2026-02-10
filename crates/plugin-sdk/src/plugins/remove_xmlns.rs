@@ -76,7 +76,7 @@ impl Default for RemoveXmlnsPlugin {
 
 impl Plugin for RemoveXmlnsPlugin {
     fn name(&self) -> &'static str {
-        "removeXmlns"
+        "removeXMLNS"
     }
 
     fn description(&self) -> &'static str {

@@ -30,6 +30,7 @@ macro_rules! plugin_fixture_tests {
                 for fixture in fixtures {
                     let mut config = Config::with_default_preset();
                     config.set_plugin_enabled($plugin_name, true);
+                    config.js2svg.final_newline = false;
 
                     let result = vexy_svgo_core::optimize_with_config(&fixture.input, config)?;
                     assert_eq!(result.data, fixture.expected, "Fixture: {}", fixture.name);
@@ -69,6 +70,7 @@ macro_rules! plugin_fixture_tests_with_params {
                 for fixture in fixtures {
                     let mut config = Config::with_default_preset();
                     config.set_plugin_enabled($plugin_name, true);
+                    config.js2svg.final_newline = false;
                     if let Some(params) = fixture.params {
                         config.configure_plugin($plugin_name, params);
                     }

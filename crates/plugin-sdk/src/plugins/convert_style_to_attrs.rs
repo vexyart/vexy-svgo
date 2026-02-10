@@ -99,36 +99,99 @@ const PRESENTATION_ATTRS: &[&str] = &[
     "writing-mode",
 ];
 
-// Regex for parsing CSS declarations
-static CSS_DECLARATION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r#"(?x)
-        (?:
-            /\*[\s\S]*?\*/  # CSS comments
-            |
-            (?:
-                ([-\w]+)  # property name
-                \s*:\s*
-                (
-                    (?:
-                        /\*[\s\S]*?\*/  # inline comments
-                        |
-                        '(?:[^'\\]|\\.)*'  # single-quoted strings
-                        |
-                        "(?:[^"\\]|\\.)*"  # double-quoted strings
-                        |
-                        [^;'"/!]  # any other character except !
-                    )+?
-                )
-                \s*
-                (!important)?  # optional !important
-            )
-            \s*(?:;|$)  # declaration end
-        )
-        "#,
-    )
-    .unwrap()
-});
+#[derive(Debug, Clone)]
+struct CssDeclaration {
+    property: String,
+    value: String,
+    has_important: bool,
+}
+
+fn remove_css_identifier_escapes(identifier: &str) -> String {
+    identifier.replace('\\', "")
+}
+
+fn split_declarations(style: &str) -> Vec<String> {
+    let mut declarations = Vec::new();
+    let mut current = String::new();
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut paren_depth = 0usize;
+
+    for ch in style.chars() {
+        match ch {
+            '\'' if !in_double_quote => {
+                in_single_quote = !in_single_quote;
+                current.push(ch);
+            }
+            '"' if !in_single_quote => {
+                in_double_quote = !in_double_quote;
+                current.push(ch);
+            }
+            '(' if !in_single_quote && !in_double_quote => {
+                paren_depth += 1;
+                current.push(ch);
+            }
+            ')' if !in_single_quote && !in_double_quote => {
+                paren_depth = paren_depth.saturating_sub(1);
+                current.push(ch);
+            }
+            ';' if !in_single_quote && !in_double_quote && paren_depth == 0 => {
+                let trimmed = current.trim();
+                if !trimmed.is_empty() {
+                    declarations.push(trimmed.to_string());
+                }
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        declarations.push(trimmed.to_string());
+    }
+
+    declarations
+}
+
+fn parse_css_declarations(style: &str) -> Vec<CssDeclaration> {
+    let mut declarations = Vec::new();
+    for declaration in split_declarations(style) {
+        let declaration = strip_css_comments(&declaration);
+        let Some((property, raw_value)) = declaration.split_once(':') else {
+            continue;
+        };
+
+        let property = remove_css_identifier_escapes(property.trim());
+        if property.is_empty() {
+            continue;
+        }
+
+        let mut value = strip_css_comments(raw_value).trim().to_string();
+        if value.is_empty() {
+            continue;
+        }
+
+        let lower = value.to_ascii_lowercase();
+        let important_suffix = "!important";
+        let has_important = lower.ends_with(important_suffix);
+        if has_important {
+            let suffix_pos = value.len() - important_suffix.len();
+            value = value[..suffix_pos].trim_end().to_string();
+            if value.is_empty() {
+                continue;
+            }
+        }
+
+        declarations.push(CssDeclaration {
+            property,
+            value,
+            has_important,
+        });
+    }
+
+    declarations
+}
 
 /// Plugin that converts inline styles to SVG presentation attributes
 pub struct ConvertStyleToAttrsPlugin {
@@ -192,6 +255,11 @@ impl Plugin for ConvertStyleToAttrsPlugin {
         Ok(())
     }
 
+    fn configure(&mut self, params: &Value) -> Result<()> {
+        self.config = Self::parse_config(params)?;
+        Ok(())
+    }
+
     fn apply(&self, document: &mut Document) -> Result<()> {
         let mut visitor = ConvertStyleToAttrsVisitor::new(self.config.clone());
         vexy_svgo_core::visitor::walk_document(&mut visitor, document)?;
@@ -204,6 +272,18 @@ fn strip_css_comments(value: &str) -> String {
     // Simple regex to remove CSS comments
     static COMMENT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/\*[\s\S]*?\*/").unwrap());
     COMMENT_RE.replace_all(value, "").to_string()
+}
+
+fn strip_wrapping_quotes(value: &str) -> String {
+    let bytes = value.as_bytes();
+    if bytes.len() >= 2 {
+        let first = bytes[0] as char;
+        let last = bytes[bytes.len() - 1] as char;
+        if (first == '\'' || first == '"') && first == last {
+            return value[1..value.len() - 1].to_string();
+        }
+    }
+    value.to_string()
 }
 
 /// Visitor implementation that converts styles to attributes
@@ -224,46 +304,35 @@ impl ConvertStyleToAttrsVisitor {
             let mut new_attributes = Vec::new();
 
             // Parse CSS declarations
-            for cap in CSS_DECLARATION_RE.captures_iter(&style_value) {
-                if let (Some(prop_match), Some(value_match)) = (cap.get(1), cap.get(2)) {
-                    let property = prop_match.as_str().trim();
-                    let cleaned_value = strip_css_comments(value_match.as_str());
-                    let value = cleaned_value.trim();
-                    let has_important = cap.get(3).is_some();
+            for declaration in parse_css_declarations(&style_value) {
+                let property = declaration.property;
+                let value = declaration.value;
+                let has_important = declaration.has_important;
 
-                    // Check if this is a presentation attribute
-                    if PRESENTATION_ATTRS.contains(&property) {
-                        // Handle !important declarations
+                // Check if this is a presentation attribute
+                if PRESENTATION_ATTRS.contains(&property.as_str()) {
+                        let attribute_value = strip_wrapping_quotes(&value);
+
                         if has_important {
                             if self.config.keep_important {
-                                // Keep in style if it has !important and keepImportant is true
-                                remaining_styles.push(format!("{}: {} !important", property, value));
-                            }
-                            // Otherwise drop it entirely (don't convert to attribute)
-                        } else {
-                            // No !important, convert to attribute if doesn't already exist
-                            if !element.attributes.contains_key(property) {
-                                new_attributes.push((property.to_string(), value.to_string()));
+                                remaining_styles.push(format!("{}:{}!important", property, value));
+                            } else if !element.attributes.contains_key(property.as_str()) {
+                                new_attributes.push((property.clone(), attribute_value));
                             } else {
-                                // Keep in style if attribute already exists
-                                remaining_styles.push(format!("{}: {}", property, value));
+                                remaining_styles.push(format!("{}:{}", property, value));
                             }
-                        }
+                        } else if !element.attributes.contains_key(property.as_str()) {
+                                new_attributes.push((property.clone(), attribute_value));
+                            } else {
+                                remaining_styles.push(format!("{}:{}", property, value));
+                            }
                     } else {
-                        // Not a presentation attribute, keep in style
                         if has_important {
-                            remaining_styles.push(format!("{}: {} !important", property, value));
+                            remaining_styles.push(format!("{}:{}!important", property, value));
                         } else {
-                            remaining_styles.push(format!("{}: {}", property, value));
+                            remaining_styles.push(format!("{}:{}", property, value));
                         }
                     }
-                } else if cap.get(0).is_some() {
-                    // Capture other content (like comments) to preserve
-                    let content = cap.get(0).unwrap().as_str().trim();
-                    if !content.is_empty() && !content.starts_with("/*") {
-                        remaining_styles.push(content.to_string());
-                    }
-                }
             }
 
             // Add new attributes
@@ -277,7 +346,7 @@ impl ConvertStyleToAttrsVisitor {
             } else {
                 element
                     .attributes
-                    .insert("style".into(), remaining_styles.join("; ").into());
+                    .insert("style".into(), remaining_styles.join(";").into());
             }
         }
     }
@@ -342,15 +411,12 @@ mod unit_tests {
     fn test_css_declaration_regex() {
         let style = "fill: red !important; stroke: blue";
         let mut captures = Vec::new();
-        for cap in CSS_DECLARATION_RE.captures_iter(style) {
-            let prop = cap.get(1).map(|m| m.as_str()).unwrap_or("");
-            let val = cap.get(2).map(|m| m.as_str()).unwrap_or("");
-            let imp = cap.get(3).is_some();
-            captures.push((prop, val, imp));
+        for decl in parse_css_declarations(style) {
+            captures.push((decl.property, decl.value, decl.has_important));
         }
         assert_eq!(captures.len(), 2);
-        assert_eq!(captures[0], ("fill", "red", true));
-        assert_eq!(captures[1], ("stroke", "blue", false));
+        assert_eq!(captures[0], ("fill".to_string(), "red".to_string(), true));
+        assert_eq!(captures[1], ("stroke".to_string(), "blue".to_string(), false));
     }
 
     #[test]
@@ -394,7 +460,7 @@ mod unit_tests {
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
             assert_eq!(rect.attr("fill"), Some("green"));
             assert_eq!(rect.attr("stroke"), Some("blue"));
-            assert_eq!(rect.attr("style"), Some("fill: red"));
+            assert_eq!(rect.attr("style"), Some("fill:red"));
         }
     }
 
@@ -414,7 +480,7 @@ mod unit_tests {
         // Check that only presentation attributes were converted
         if let Some(Node::Element(circle)) = doc.root.children.get(0) {
             assert_eq!(circle.attr("fill"), Some("green"));
-            assert_eq!(circle.attr("style"), Some("custom-prop: value; -webkit-something: test"));
+            assert_eq!(circle.attr("style"), Some("custom-prop:value;-webkit-something:test"));
         }
     }
 
@@ -431,9 +497,10 @@ mod unit_tests {
 
         plugin.apply(&mut doc).unwrap();
 
-        // Check that !important declaration was dropped (default behavior)
+        // With keepImportant=false (default), !important declarations are
+        // still converted to attributes — the !important flag is stripped
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
-            assert!(!rect.attributes.contains_key("fill"));
+            assert_eq!(rect.attr("fill"), Some("red"));
             assert_eq!(rect.attr("stroke"), Some("blue"));
             assert!(!rect.attributes.contains_key("style"));
         }
@@ -459,7 +526,7 @@ mod unit_tests {
         if let Some(Node::Element(rect)) = doc.root.children.get(0) {
             assert!(!rect.attributes.contains_key("fill"));
             assert_eq!(rect.attr("stroke"), Some("blue"));
-            assert_eq!(rect.attr("style"), Some("fill: red !important"));
+            assert_eq!(rect.attr("style"), Some("fill:red!important"));
         }
     }
 
@@ -496,4 +563,4 @@ mod unit_tests {
 }
 
 // Use parameterized testing framework for SVGO fixture tests
-crate::plugin_fixture_tests!(ConvertStyleToAttrsPlugin, "convertStyleToAttrs");
+crate::plugin_fixture_tests_with_params!(ConvertStyleToAttrsPlugin, "convertStyleToAttrs");

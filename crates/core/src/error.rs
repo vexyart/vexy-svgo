@@ -17,6 +17,9 @@ pub enum VexyError {
     #[error("Regex error: {0}")]
     Regex(String),
 
+    #[error("Memory budget exceeded: {0}")]
+    Memory(#[from] crate::optimizer::memory::MemoryError),
+
     #[error("{0}")]
     General(String),
 }

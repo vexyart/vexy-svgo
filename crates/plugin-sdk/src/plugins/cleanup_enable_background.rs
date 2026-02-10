@@ -7,7 +7,7 @@
 
 use crate::Plugin;
 use anyhow::Result;
-use vexy_svgo_core::ast::{Document, Element};
+use vexy_svgo_core::ast::{Document, Element, Node};
 use vexy_svgo_core::visitor::Visitor;
 use vexy_svgo_core::error::VexyError;
 
@@ -39,6 +39,7 @@ impl Plugin for CleanupEnableBackgroundPlugin {
     fn apply(&self, document: &mut Document) -> anyhow::Result<()> {
         let mut visitor = CleanupEnableBackgroundVisitor::new();
         vexy_svgo_core::visitor::walk_document(&mut visitor, document)?;
+        CleanupEnableBackgroundVisitor::cleanup_formatting_whitespace_recursive(&mut document.root);
         Ok(())
     }
 }
@@ -46,13 +47,67 @@ impl Plugin for CleanupEnableBackgroundPlugin {
 /// Visitor implementation that cleans up enable-background attributes
 struct CleanupEnableBackgroundVisitor {
     has_background_image_filter: bool,
+    has_any_filter: bool,
 }
 
 impl CleanupEnableBackgroundVisitor {
     fn new() -> Self {
         Self {
             has_background_image_filter: false,
+            has_any_filter: false,
         }
+    }
+
+    fn is_viewport_element(element_name: &str) -> bool {
+        matches!(
+            element_name,
+            "svg" | "symbol" | "image" | "foreignObject" | "pattern" | "mask"
+        )
+    }
+
+    fn is_formatting_whitespace(text: &str) -> bool {
+        text.trim().is_empty() && text.chars().any(|c| matches!(c, '\n' | '\r' | '\t'))
+    }
+
+    fn cleanup_formatting_whitespace(nodes: &mut Vec<Node>) {
+        let has_non_whitespace_content = nodes.iter().any(|node| match node {
+            Node::Element(_) => true,
+            Node::Text(text) => !text.trim().is_empty(),
+            _ => false,
+        });
+
+        if has_non_whitespace_content {
+            nodes.retain(|node| {
+                !matches!(node, Node::Text(text) if Self::is_formatting_whitespace(text))
+            });
+        }
+    }
+
+    fn cleanup_formatting_whitespace_recursive(element: &mut Element<'_>) {
+        let preserve = matches!(
+            element.name.as_ref(),
+            "text" | "tspan" | "tref" | "textPath" | "altGlyph"
+        );
+        for child in &mut element.children {
+            if let Node::Text(text) = child {
+                if !preserve && (text.contains('\n') || text.contains('\r') || text.contains('\t')) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        *text = trimmed.to_string().into();
+                    }
+                }
+            }
+        }
+        Self::cleanup_formatting_whitespace(&mut element.children);
+        for child in &mut element.children {
+            if let Node::Element(child_element) = child {
+                Self::cleanup_formatting_whitespace_recursive(child_element);
+            }
+        }
+    }
+
+    fn parse_number(value: &str) -> Option<f64> {
+        value.trim().parse::<f64>().ok()
     }
 
     fn parse_enable_background(&self, value: &str) -> Option<EnableBackground> {
@@ -84,29 +139,90 @@ impl CleanupEnableBackgroundVisitor {
         None
     }
 
-    fn should_remove_enable_background(&self, value: &str, element: &Element) -> bool {
-        // Don't remove if there's a BackgroundImage filter that might use it
-        if self.has_background_image_filter {
-            return false;
+    fn normalize_enable_background(&self, value: &str, element: &Element) -> Option<String> {
+        if !Self::is_viewport_element(element.name.as_ref()) {
+            return None;
         }
 
-        // Remove if it's just "new" (the default value)
+        if self.has_background_image_filter || self.element_has_filter_with_background(element) {
+            return Some(value.to_string());
+        }
+
         if let Some(EnableBackground::New) = self.parse_enable_background(value) {
-            return true;
+            if self.has_any_filter {
+                return Some(value.to_string());
+            }
+            return None;
         }
 
-        // Check if this element or its children have filters that might use background
-        if self.element_has_filter_with_background(element) {
-            return false;
+        if let Some(EnableBackground::NewWithCoords) = self.parse_enable_background(value) {
+            let parts: Vec<&str> = value[4..].split_whitespace().collect();
+            if parts.len() == 4 {
+                let x = Self::parse_number(parts[0]);
+                let y = Self::parse_number(parts[1]);
+                let width = Self::parse_number(parts[2]);
+                let height = Self::parse_number(parts[3]);
+                let element_width = element
+                    .attributes
+                    .get("width")
+                    .and_then(|v| Self::parse_number(v));
+                let element_height = element
+                    .attributes
+                    .get("height")
+                    .and_then(|v| Self::parse_number(v));
+
+                if let (
+                    Some(x),
+                    Some(y),
+                    Some(width),
+                    Some(height),
+                    Some(element_width),
+                    Some(element_height),
+                ) = (x, y, width, height, element_width, element_height)
+                {
+                    let x_is_zero = x.abs() < f64::EPSILON;
+                    let y_is_zero = y.abs() < f64::EPSILON;
+                    let width_matches = (width - element_width).abs() < f64::EPSILON;
+                    let height_matches = (height - element_height).abs() < f64::EPSILON;
+
+                    if x_is_zero && y_is_zero && width_matches && height_matches {
+                        if element.name == "svg" {
+                            return None;
+                        }
+                        if self.has_any_filter {
+                            return Some("new".to_string());
+                        }
+                        return None;
+                    }
+                }
+            }
         }
 
-        // Remove if enable-background is on an element that doesn't establish a viewport
-        // (only svg, symbol, image, foreignObject establish new viewports)
-        if !matches!(element.name.as_ref(), "svg" | "symbol" | "image" | "foreignObject") {
-            return true;
+        Some(value.to_string())
+    }
+
+    fn cleanup_style_attribute(style: &str) -> Option<String> {
+        let mut kept_declarations = Vec::new();
+        for declaration in style.split(';') {
+            let trimmed = declaration.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let property_name = trimmed
+                .split_once(':')
+                .map(|(name, _)| name.trim())
+                .unwrap_or("");
+            if property_name == "enable-background" {
+                continue;
+            }
+            kept_declarations.push(trimmed);
         }
 
-        false
+        if kept_declarations.is_empty() {
+            None
+        } else {
+            Some(kept_declarations.join("; "))
+        }
     }
 
     fn element_has_filter_with_background(&self, element: &Element) -> bool {
@@ -126,6 +242,10 @@ impl CleanupEnableBackgroundVisitor {
     }
 
     fn check_for_background_image_filter(&mut self, element: &Element) {
+        if element.name == "filter" {
+            self.has_any_filter = true;
+        }
+
         if element.name == "feImage" || element.name == "feBlend" {
             // Check for BackgroundImage or BackgroundAlpha usage
             if let Some(in_attr) = element.attributes.get("in") {
@@ -160,8 +280,30 @@ impl Visitor<'_> for CleanupEnableBackgroundVisitor {
     fn visit_element_exit(&mut self, element: &mut Element<'_>) -> Result<(), VexyError> {
         // Process enable-background attribute after we've checked all children
         if let Some(enable_bg_value) = element.attributes.get("enable-background").cloned() {
-            if self.should_remove_enable_background(&enable_bg_value, element) {
-                element.attributes.shift_remove("enable-background");
+            match self.normalize_enable_background(&enable_bg_value, element) {
+                None => {
+                    element.attributes.shift_remove("enable-background");
+                }
+                Some(normalized) => {
+                    if normalized != enable_bg_value.as_ref() {
+                        element
+                            .attributes
+                            .insert("enable-background".into(), normalized.into());
+                    }
+                }
+            }
+        }
+
+        if let Some(style_value) = element.attributes.get("style").cloned() {
+            match Self::cleanup_style_attribute(&style_value) {
+                None => {
+                    element.attributes.shift_remove("style");
+                }
+                Some(cleaned_style) => {
+                    if cleaned_style != style_value.as_ref() {
+                        element.attributes.insert("style".into(), cleaned_style.into());
+                    }
+                }
             }
         }
         
