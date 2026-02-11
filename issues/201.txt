@@ -1,3 +1,0 @@
-Make sure that the same plugins are turned on by default in Vexy SVGO vs. npx svgo ( https://github.com/svg/svgo )
-
-Make sure that the results between Vexy SVGO and svgo with default plugins differ by no more than 1% or so, that is, that both tools give similar minification/optimization

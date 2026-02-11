@@ -1,2 +1,0 @@
-We've ran `./build.sh;gitnextver;./release.sh >release.log.txt 2>release.err.txt`
-Now analyze: build.log.txt build.err.txt release.log.txt release.err.txt

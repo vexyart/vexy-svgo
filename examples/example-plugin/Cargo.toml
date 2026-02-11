@@ -1,8 +1,0 @@
-[package]
-name = "example-plugin"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-vexy-svgo-core = { path = "../../crates/core" }
-vexy-svgo-plugin-sdk = { path = "../../crates/plugin-sdk" }

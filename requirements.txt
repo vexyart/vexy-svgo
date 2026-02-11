@@ -1,3 +1,0 @@
-mkdocs-material>=9.5
-mkdocs-awesome-nav>=2.9
-mkdocs-nav-weight>=0.2.0

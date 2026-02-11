@@ -1,5 +1,0 @@
-[target.wasm32-unknown-unknown]
-rustflags = [
-    "-C", "target-feature=+crt-static",
-    "--cfg", "getrandom_backend=\"wasm_js\"",
-]
